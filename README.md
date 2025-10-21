@@ -73,7 +73,176 @@ docker compose exec batch-processor python processor.py
 curl http://localhost:8000/thoughts/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11 | python -m json.tool
 ```
 
-## How It Works
+## System Architecture
+
+### High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[Web UI<br/>Port 3000]
+    end
+    
+    subgraph "API Layer"
+        API[FastAPI Server<br/>Port 8000]
+    end
+    
+    subgraph "Processing Layer"
+        BP[Batch Processor<br/>Continuous Mode]
+        CACHE[Semantic Cache<br/>pgvector]
+    end
+    
+    subgraph "AI Providers"
+        GEMINI[Google Gemini]
+        CLAUDE[Anthropic Claude]
+        GPT[OpenAI GPT]
+    end
+    
+    subgraph "Data Layer"
+        DB[(PostgreSQL<br/>+ pgvector)]
+    end
+    
+    UI -->|REST API| API
+    API -->|CRUD| DB
+    BP -->|Read/Write| DB
+    BP -->|Check Cache| CACHE
+    CACHE -->|Vector Search| DB
+    BP -->|Generate| GEMINI
+    BP -->|Generate| CLAUDE
+    BP -->|Generate| GPT
+    
+    style UI fill:#667eea,color:#fff
+    style API fill:#764ba2,color:#fff
+    style BP fill:#f093fb,color:#fff
+    style DB fill:#4facfe,color:#fff
+    style GEMINI fill:#34a853,color:#fff
+    style CLAUDE fill:#f97316,color:#fff
+    style GPT fill:#10b981,color:#fff
+```
+
+### Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant DB
+    participant BatchProcessor
+    participant Cache
+    participant AI
+    
+    User->>Frontend: Submit thought
+    Frontend->>API: POST /thoughts
+    API->>DB: INSERT thought (status: pending)
+    API-->>Frontend: 201 Created
+    Frontend-->>User: Thought saved!
+    
+    Note over BatchProcessor: Runs every 10s
+    
+    BatchProcessor->>DB: Get pending thoughts
+    DB-->>BatchProcessor: List of thoughts
+    
+    BatchProcessor->>Cache: Check semantic similarity
+    alt Cache Hit
+        Cache-->>BatchProcessor: Cached result
+    else Cache Miss
+        BatchProcessor->>AI: Process through 5-agent pipeline
+        AI-->>BatchProcessor: Analysis result
+        BatchProcessor->>Cache: Save to cache
+    end
+    
+    BatchProcessor->>DB: UPDATE thought (status: completed)
+    
+    User->>Frontend: View results
+    Frontend->>API: GET /thoughts/{user_id}
+    API->>DB: SELECT thoughts
+    DB-->>API: Thought with analysis
+    API-->>Frontend: JSON response
+    Frontend-->>User: Display analysis
+```
+
+### 5-Agent Processing Pipeline
+
+```mermaid
+graph LR
+    START([Thought Input]) --> A1
+    
+    subgraph "5-Agent Pipeline"
+        A1[Agent 1<br/>Classifier]
+        A2[Agent 2<br/>Analyzer]
+        A3[Agent 3<br/>Value Assessor]
+        A4[Agent 4<br/>Action Planner]
+        A5[Agent 5<br/>Prioritizer]
+        
+        A1 -->|Type, Urgency<br/>Emotional Tone| A2
+        A2 -->|Core Issue<br/>Context Analysis| A3
+        A3 -->|Value Scores<br/>6 Dimensions| A4
+        A4 -->|Action Steps<br/>Quick Wins| A5
+        A5 -->|Priority Level<br/>Reasoning| END
+    end
+    
+    END([Complete Analysis])
+    
+    style A1 fill:#667eea,color:#fff
+    style A2 fill:#764ba2,color:#fff
+    style A3 fill:#f093fb,color:#fff
+    style A4 fill:#4facfe,color:#fff
+    style A5 fill:#00f2fe,color:#fff
+    style START fill:#34a853,color:#fff
+    style END fill:#f97316,color:#fff
+```
+
+### Database Schema
+
+```mermaid
+erDiagram
+    USERS ||--o{ THOUGHTS : creates
+    USERS ||--o{ THOUGHT_CACHE : owns
+    USERS ||--o{ WEEKLY_SYNTHESIS : receives
+    
+    USERS {
+        uuid id PK
+        string email
+        jsonb context
+        int context_version
+        timestamp created_at
+    }
+    
+    THOUGHTS {
+        uuid id PK
+        uuid user_id FK
+        string text
+        string status
+        timestamp created_at
+        timestamp processed_at
+        jsonb classification
+        jsonb analysis
+        jsonb value_impact
+        jsonb action_plan
+        jsonb priority
+        vector embedding
+    }
+    
+    THOUGHT_CACHE {
+        uuid id PK
+        uuid user_id FK
+        string thought_text
+        vector embedding
+        jsonb response
+        int hit_count
+        timestamp expires_at
+    }
+    
+    WEEKLY_SYNTHESIS {
+        uuid id PK
+        uuid user_id FK
+        date week_start
+        date week_end
+        jsonb synthesis
+        timestamp created_at
+    }
+```
 
 ## How It Works
 
