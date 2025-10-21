@@ -492,7 +492,7 @@
 
         // View details
         function viewDetails(thoughtId) {
-            window.open(`${API_URL}/thoughts/${currentUserId}/${thoughtId}`, '_blank');
+            window.location.href = `/detail.html?user_id=${currentUserId}&id=${thoughtId}`;
         }
 
         // Delete thought

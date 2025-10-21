@@ -157,7 +157,12 @@ class SemanticCache:
                     f"Cache HIT! Similarity: {similarity:.3f} "
                     f"(threshold: {self.threshold})"
                 )
-                return cached_thought.get("response")
+                # Parse JSON response if it's a string
+                response = cached_thought.get("response")
+                if isinstance(response, str):
+                    import json
+                    response = json.loads(response)
+                return response
 
             logger.info("Cache MISS - no similar thought found")
             return None

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thought Detail - AI Thought Processor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+        
+        .status-completed {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-pending {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .status-processing {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .status-failed {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .thought-text {
+            font-size: 20px;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+        }
+        
+        .meta-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .meta-item strong {
+            display: block;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .section {
+            margin: 30px 0;
+        }
+        
+        .section-title {
+            color: #667eea;
+            font-size: 22px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+        
+        .priority-critical {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .priority-high {
+            background: #fd7e14;
+            color: white;
+        }
+        
+        .priority-medium {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .priority-low {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .info-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+        
+        .info-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .info-box li {
+            margin: 8px 0;
+            line-height: 1.5;
+            color: #555;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .score-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← Back to Thoughts</a>
+        
+        <div id="content"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        // Get thought ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id');
+        const thoughtId = urlParams.get('id');
+        
+        if (!userId || !thoughtId) {
+            document.getElementById('content').innerHTML = `
+                <div class="card">
+                    <div class="error-message">Missing user_id or thought id in URL</div>
+                </div>
+            `;
+        } else {
+            loadThought(userId, thoughtId);
+        }
+        
+        async function loadThought(userId, thoughtId) {
+            const contentEl = document.getElementById('content');
+            contentEl.innerHTML = '<div class="loading"><div class="spinner"></div>Loading thought details...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/thoughts/${userId}/${thoughtId}`);
+                const thought = await response.json();
+                
+                if (response.ok) {
+                    contentEl.innerHTML = renderThoughtDetail(thought);
+                } else {
+                    contentEl.innerHTML = `
+                        <div class="card">
+                            <div class="error-message">Error: ${thought.detail || 'Failed to load thought'}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                contentEl.innerHTML = `
+                    <div class="card">
+                        <div class="error-message">Error: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderThoughtDetail(thought) {
+            const date = new Date(thought.created_at).toLocaleString();
+            const processedDate = thought.processed_at ? new Date(thought.processed_at).toLocaleString() : 'Not processed yet';
+            
+            let html = `
+                <div class="card">
+                    <div class="header">
+                        <span class="status-badge status-${thought.status}">${thought.status}</span>
+                        <h1 style="font-size: 28px; color: #333; margin: 15px 0;">Thought Analysis</h1>
+                    </div>
+                    
+                    <div class="thought-text">${thought.text}</div>
+                    
+                    <div class="meta-info">
+                        <div class="meta-item">
+                            <strong>Created</strong>
+                            ${date}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Processed</strong>
+                            ${processedDate}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Thought ID</strong>
+                            ${thought.id.substring(0, 16)}...
+                        </div>
+                    </div>
+            `;
+            
+            if (thought.status === 'failed' && thought.error_message) {
+                html += `
+                    <div class="section">
+                        <div class="error-message">
+                            <strong>Error:</strong> ${thought.error_message}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (thought.status === 'completed') {
+                // Priority
+                if (thought.priority) {
+                    const priorityLevel = thought.priority.priority_level || 'unknown';
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">🎯 Priority Assessment</h2>
+                            <span class="priority-badge priority-${priorityLevel.toLowerCase()}">${priorityLevel}</span>
+                            ${thought.priority.reasoning ? `<p style="margin-top: 15px; color: #555; line-height: 1.6;">${thought.priority.reasoning}</p>` : ''}
+                        </div>
+                    `;
+                }
+                
+                // Classification
+                if (thought.classification) {
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">📊 Classification</h2>
+                            <div class="grid-2">
+                                <div class="info-box">
+                                    <h4>Type</h4>
+                                    <p><strong>${thought.classification.type || 'N/A'}</strong></p>
+                                </div>
+                                <div class="info-box">
+                                    <h4>Urgency</h4>
+                                    <p><strong>${thought.classification.urgency || 'N/A'}</strong></p>
+                                </div>
+                                <div class="info-box">
+                                    <h4>Emotional Tone</h4>
+                                    <p>${thought.classification.emotional_tone || 'N/A'}</p>
+                                </div>
+                                <div class="info-box">
+                                    <h4>Complexity</h4>
+                                    <p>${thought.classification.complexity || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Analysis
+                if (thought.analysis) {
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">🔍 Deep Analysis</h2>
+                    `;
+                    
+                    if (thought.analysis.core_issue) {
+                        html += `
+                            <div class="info-box">
+                                <h4>Core Issue</h4>
+                                <p>${thought.analysis.core_issue}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    if (thought.analysis.context_factors && thought.analysis.context_factors.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>Context Factors</h4>
+                                <ul>
+                                    ${thought.analysis.context_factors.map(f => `<li>${f}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    if (thought.analysis.assumptions && thought.analysis.assumptions.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>Assumptions</h4>
+                                <ul>
+                                    ${thought.analysis.assumptions.map(a => `<li>${a}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `</div>`;
+                }
+                
+                // Value Impact
+                if (thought.value_impact) {
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">💎 Value Impact <span class="score-badge">${thought.value_impact.weighted_total || 0}/10</span></h2>
+                            <div class="grid-2">
+                    `;
+                    
+                    const dimensions = [
+                        { key: 'health', label: 'Health', emoji: '🏥' },
+                        { key: 'relationships', label: 'Relationships', emoji: '❤️' },
+                        { key: 'career', label: 'Career', emoji: '💼' },
+                        { key: 'learning', label: 'Learning', emoji: '📚' },
+                        { key: 'financial', label: 'Financial', emoji: '💰' },
+                        { key: 'purpose', label: 'Purpose', emoji: '🎯' }
+                    ];
+                    
+                    dimensions.forEach(dim => {
+                        if (thought.value_impact[dim.key] !== undefined) {
+                            html += `
+                                <div class="info-box">
+                                    <h4>${dim.emoji} ${dim.label}</h4>
+                                    <p><strong>Score: ${thought.value_impact[dim.key]}/10</strong></p>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Action Plan
+                if (thought.action_plan) {
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">📋 Action Plan</h2>
+                    `;
+                    
+                    if (thought.action_plan.quick_wins && thought.action_plan.quick_wins.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>⚡ Quick Wins (Do These Now!)</h4>
+                                <ul>
+                                    ${thought.action_plan.quick_wins.map(w => `
+                                        <li>
+                                            <strong>${w.action}</strong>
+                                            ${w.estimated_time ? ` <em>(${w.estimated_time})</em>` : ''}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    if (thought.action_plan.short_term && thought.action_plan.short_term.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>📅 Short-term Actions (This Week)</h4>
+                                <ul>
+                                    ${thought.action_plan.short_term.map(a => `<li>${a.action || a}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    if (thought.action_plan.long_term && thought.action_plan.long_term.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>🎯 Long-term Strategy</h4>
+                                <ul>
+                                    ${thought.action_plan.long_term.map(a => `<li>${a.action || a}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    if (thought.action_plan.resources_needed && thought.action_plan.resources_needed.length > 0) {
+                        html += `
+                            <div class="info-box">
+                                <h4>🛠️ Resources Needed</h4>
+                                <ul>
+                                    ${thought.action_plan.resources_needed.map(r => `<li>${r}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `</div>`;
+                }
+            }
+            
+            html += `</div>`;
+            return html;
+        }
+    </script>
+</body>
+</html>

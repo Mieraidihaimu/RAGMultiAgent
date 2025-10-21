@@ -79,7 +79,7 @@ class BatchThoughtProcessor:
         try:
             update_data = {
                 "status": "completed",
-                "processed_at": datetime.utcnow().isoformat(),
+                "processed_at": datetime.utcnow(),
                 "classification": result.get("classification"),
                 "analysis": result.get("analysis"),
                 "value_impact": result.get("value_impact"),
@@ -306,6 +306,16 @@ Return JSON with:
         """
         Main batch processing entry point
         """
+        # Reset stats for this run
+        self.stats = {
+            "total_thoughts": 0,
+            "processed": 0,
+            "failed": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "start_time": None,
+            "end_time": None
+        }
         self.stats["start_time"] = datetime.utcnow()
         logger.info("="*60)
         logger.info("Starting batch processing run")

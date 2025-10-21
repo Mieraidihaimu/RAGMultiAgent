@@ -34,6 +34,22 @@ class PostgreSQLAdapter(DatabaseAdapter):
         self.password = password
         self.pool: Optional[asyncpg.Pool] = None
 
+    @staticmethod
+    def _parse_json_fields(row: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse JSON string fields back to dicts"""
+        import json
+        
+        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context', 'response'}
+        
+        for field in json_fields:
+            if field in row and row[field] is not None and isinstance(row[field], str):
+                try:
+                    row[field] = json.loads(row[field])
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Keep as string if parsing fails
+        
+        return row
+
         logger.info(f"Initialized PostgreSQL adapter for {host}:{port}/{database}")
 
     async def connect(self):
@@ -105,7 +121,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                     "SELECT * FROM thoughts WHERE id = $1",
                     thought_id
                 )
-            return dict(row) if row else None
+            return self._parse_json_fields(dict(row)) if row else None
 
     async def get_thoughts(
         self,
@@ -136,7 +152,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                     """,
                     user_id, limit, offset
                 )
-            return [dict(row) for row in rows]
+            return [self._parse_json_fields(dict(row)) for row in rows]
 
     async def get_pending_thoughts(self) -> List[Dict[str, Any]]:
         """Get all pending thoughts with user context"""
@@ -150,7 +166,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 ORDER BY t.created_at
                 """
             )
-            return [dict(row) for row in rows]
+            return [self._parse_json_fields(dict(row)) for row in rows]
 
     async def update_thought(
         self,
@@ -158,12 +174,24 @@ class PostgreSQLAdapter(DatabaseAdapter):
         **fields
     ) -> Dict[str, Any]:
         """Update thought fields"""
+        import json
+        
+        # JSON fields that need serialization
+        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context'}
+        
         # Build dynamic UPDATE query
         set_clauses = []
         values = []
         param_index = 1
 
         for key, value in fields.items():
+            # Serialize dict values to JSON strings for JSONB columns
+            if key in json_fields and isinstance(value, dict):
+                value = json.dumps(value)
+            # Handle vector embeddings - convert list to string format for pgvector
+            elif key == 'embedding' and isinstance(value, list):
+                value = str(value)
+            
             set_clauses.append(f"{key} = ${param_index}")
             values.append(value)
             param_index += 1
@@ -236,6 +264,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
         threshold: float = 0.92
     ) -> Optional[Dict[str, Any]]:
         """Find similar cached thought using vector similarity"""
+        # Convert list to pgvector format string
+        embedding_str = str(embedding)
+        
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -248,7 +279,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 ORDER BY embedding <=> $1::vector
                 LIMIT 1
                 """,
-                embedding, user_id, threshold
+                embedding_str, user_id, threshold
             )
             return dict(row) if row else None
 
@@ -261,7 +292,13 @@ class PostgreSQLAdapter(DatabaseAdapter):
         ttl_days: int = 7
     ) -> Dict[str, Any]:
         """Save to cache"""
+        import json
+        
         expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+        # Convert list to pgvector format string
+        embedding_str = str(embedding)
+        # Serialize response dict to JSON string
+        response_json = json.dumps(response)
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -271,7 +308,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING *
                 """,
-                user_id, thought_text, embedding, response, expires_at
+                user_id, thought_text, embedding_str, response_json, expires_at
             )
             return dict(row) if row else None
 
