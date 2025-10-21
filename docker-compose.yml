@@ -1,0 +1,135 @@
+services:
+  # PostgreSQL database with pgvector extension
+  db:
+    image: ankane/pgvector:latest
+    container_name: thoughtprocessor-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-thoughtprocessor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-thoughtprocessor}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-thoughtprocessor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thoughtprocessor-network
+
+  # FastAPI backend service
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: thoughtprocessor-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Database (use this for local dev, or Supabase for production)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-thoughtprocessor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-thoughtprocessor}
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+
+      # API Config
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      DEBUG: ${DEBUG:-false}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+      - ./common:/app/common
+      - api_logs:/app/logs
+    networks:
+      - thoughtprocessor-network
+    restart: unless-stopped
+
+  # Batch processor (runs as cron job)
+  batch-processor:
+    build:
+      context: .
+      dockerfile: batch_processor/Dockerfile
+    container_name: thoughtprocessor-batch
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-thoughtprocessor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-thoughtprocessor}
+
+      # AI Provider Selection
+      AI_PROVIDER: ${AI_PROVIDER:-google}
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+
+      # Model Config
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-4000}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+
+      # Caching
+      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.92}
+      SEMANTIC_CACHE_TTL_DAYS: ${SEMANTIC_CACHE_TTL_DAYS:-7}
+      PROMPT_CACHE_ENABLED: ${PROMPT_CACHE_ENABLED:-true}
+
+      # Processing
+      RATE_LIMIT_DELAY: ${RATE_LIMIT_DELAY:-0.5}
+      MAX_RETRIES: ${MAX_RETRIES:-3}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./batch_processor:/app
+      - ./common:/app/common
+      - batch_logs:/app/logs
+    networks:
+      - thoughtprocessor-network
+    # For cron-based execution, uncomment the following:
+    # command: cron -f
+    # For manual/on-demand execution, use default CMD from Dockerfile
+    restart: unless-stopped
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: thoughtprocessor-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+
+volumes:
+  postgres_data:
+    driver: local
+  api_logs:
+    driver: local
+  batch_logs:
+    driver: local
+
+networks:
+  thoughtprocessor-network:
+    driver: bridge

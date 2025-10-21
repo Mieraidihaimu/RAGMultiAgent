@@ -1,0 +1,10 @@
+# Cron job for nightly batch processing
+# Runs at 2 AM UTC daily
+
+# Environment variables need to be set in docker-compose.yml
+0 2 * * * root cd /app && /usr/local/bin/python processor.py >> /var/log/cron.log 2>&1
+
+# Weekly synthesis on Sundays at 3 AM
+0 3 * * 0 root cd /app && /usr/local/bin/python processor.py >> /var/log/cron.log 2>&1
+
+# Empty line required at end of cron file
