@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     cron \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy requirements from root
 COPY requirements.txt .
 
 # Install Python dependencies

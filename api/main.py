@@ -360,6 +360,28 @@ async def get_all_syntheses(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post(
+    "/process/trigger",
+    tags=["Processing"],
+    response_model=dict
+)
+async def trigger_processing():
+    """
+    Trigger manual batch processing
+    Note: This is a simple trigger - actual processing happens in the batch-processor service
+    """
+    try:
+        logger.info("Manual processing triggered via API")
+        return {
+            "status": "triggered",
+            "message": "Processing will begin shortly. The batch processor runs continuously in the background.",
+            "note": "Check thought status after a few seconds"
+        }
+    except Exception as e:
+        logger.error(f"Error triggering processing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler"""

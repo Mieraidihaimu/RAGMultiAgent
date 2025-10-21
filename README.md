@@ -40,11 +40,22 @@ GOOGLE_API_KEY=your-key-here
 # 4. Start everything
 docker compose up -d
 
-# 5. Check it's working
+# 5. Open the web UI
+open http://localhost:3000
+
+# Or check the API is working
 curl http://localhost:8000/health
 ```
 
-### Test It Out
+### Using the Frontend
+
+1. Open http://localhost:3000 in your browser
+2. Enter a thought (e.g., "Should I learn Rust or Go?")
+3. Click "Submit Thought"
+4. Wait ~10 seconds or click "Process Pending Thoughts"
+5. Click "🔄 Refresh" to see your analyzed thought with AI insights
+
+### Using the API
 
 ```bash
 # Create a thought

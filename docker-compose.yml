@@ -25,7 +25,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: api/Dockerfile
+      dockerfile: ./api/Dockerfile
     container_name: thoughtprocessor-api
     ports:
       - "8000:8000"
@@ -60,50 +60,30 @@ services:
   batch-processor:
     build:
       context: .
-      dockerfile: batch_processor/Dockerfile
+      dockerfile: ./batch_processor/Dockerfile
     container_name: thoughtprocessor-batch
+    env_file:
+      - .env
     environment:
-      # Database
-      DATABASE_URL: postgresql://${POSTGRES_USER:-thoughtprocessor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-thoughtprocessor}
-
-      # AI Provider Selection
-      AI_PROVIDER: ${AI_PROVIDER:-google}
-
-      # AI APIs
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
-
-      # Model Config
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
-      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-4000}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
-
-      # Caching
-      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.92}
-      SEMANTIC_CACHE_TTL_DAYS: ${SEMANTIC_CACHE_TTL_DAYS:-7}
-      PROMPT_CACHE_ENABLED: ${PROMPT_CACHE_ENABLED:-true}
-
-      # Processing
-      RATE_LIMIT_DELAY: ${RATE_LIMIT_DELAY:-0.5}
-      MAX_RETRIES: ${MAX_RETRIES:-3}
-
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    depends_on:
-      db:
-        condition: service_healthy
+      - CONTINUOUS_MODE=true
     volumes:
       - ./batch_processor:/app
       - ./common:/app/common
-      - batch_logs:/app/logs
+    depends_on:
+      - db
     networks:
       - thoughtprocessor-network
-    # For cron-based execution, uncomment the following:
-    # command: cron -f
-    # For manual/on-demand execution, use default CMD from Dockerfile
-    restart: unless-stopped
+    command: python processor.py
+
+  frontend:
+    build: ./frontend
+    container_name: thoughtprocessor-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - thoughtprocessor-network
 
   # Optional: pgAdmin for database management
   pgadmin:

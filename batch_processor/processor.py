@@ -196,8 +196,8 @@ class BatchThoughtProcessor:
         for thought in thoughts:
             await self.process_single_thought(thought)
 
-            # Rate limiting to avoid API throttling
-            await asyncio.sleep(settings.rate_limit_delay)
+            # Rate limiting to avoid API throttling (reduced for faster testing)
+            await asyncio.sleep(1)
 
     async def generate_weekly_synthesis(self, user_id: str):
         """
@@ -371,9 +371,24 @@ Return JSON with:
 
 async def main():
     """Entry point for batch processing"""
+    continuous_mode = os.getenv('CONTINUOUS_MODE', 'false').lower() == 'true'
+    
     db = await DatabaseFactory.create_from_env(use_supabase=False)
     processor = BatchThoughtProcessor(db)
-    await processor.run_batch()
+    
+    if continuous_mode:
+        logger.info("Running in continuous mode - will check for new thoughts every 10 seconds")
+        try:
+            while True:
+                await processor.run_batch()
+                logger.info("Waiting 10 seconds before next check...")
+                await asyncio.sleep(10)
+        except KeyboardInterrupt:
+            logger.info("Continuous mode stopped by user")
+    else:
+        logger.info("Running in single-batch mode")
+        await processor.run_batch()
+    
     await db.disconnect()
 
 
