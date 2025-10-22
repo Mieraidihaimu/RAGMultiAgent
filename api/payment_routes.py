@@ -100,23 +100,22 @@ async def create_subscription(
             },
         )
 
-        # Create subscription
+        # Create a product and price first
+        product = stripe.Product.create(
+            name=f'AI Thought Processor - {request.plan.title()} Plan',
+        )
+        
+        price = stripe.Price.create(
+            product=product.id,
+            unit_amount=PLAN_PRICES[request.plan],
+            currency='usd',
+            recurring={'interval': 'month'},
+        )
+
+        # Create subscription with the price
         subscription = stripe.Subscription.create(
             customer=customer.id,
-            items=[
-                {
-                    'price_data': {
-                        'currency': 'usd',
-                        'product_data': {
-                            'name': f'AI Thought Processor - {request.plan.title()} Plan',
-                        },
-                        'unit_amount': PLAN_PRICES[request.plan],
-                        'recurring': {
-                            'interval': 'month',
-                        },
-                    },
-                },
-            ],
+            items=[{'price': price.id}],
             payment_behavior='default_incomplete',
             payment_settings={'save_default_payment_method': 'on_subscription'},
             expand=['latest_invoice.payment_intent'],
@@ -124,16 +123,16 @@ async def create_subscription(
 
         # Create user account in database
         user_id = str(uuid4())
-        await db.execute(
-            """
-            INSERT INTO users (id, email, created_at, subscription_plan, subscription_id, stripe_customer_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (email) DO UPDATE
-            SET subscription_plan = $4, subscription_id = $5, stripe_customer_id = $6
-            RETURNING id
-            """,
-            user_id, request.email, datetime.utcnow(), request.plan, subscription.id, customer.id
-        )
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users (id, email, created_at, subscription_plan, subscription_id, stripe_customer_id)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (email) DO UPDATE
+                SET subscription_plan = $4, subscription_id = $5, stripe_customer_id = $6
+                """,
+                user_id, request.email, datetime.utcnow(), request.plan, subscription.id, customer.id
+            )
 
         logger.info(f"Subscription created for {request.email}: {subscription.id}")
 
@@ -175,16 +174,16 @@ async def create_free_account(
         user_id = str(uuid4())
 
         # Create user in database
-        await db.execute(
-            """
-            INSERT INTO users (id, email, created_at, subscription_plan)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (email) DO UPDATE
-            SET subscription_plan = $4
-            RETURNING id
-            """,
-            user_id, request.email, datetime.utcnow(), 'free'
-        )
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users (id, email, created_at, subscription_plan)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (email) DO UPDATE
+                SET subscription_plan = $4
+                """,
+                user_id, request.email, datetime.utcnow(), 'free'
+            )
 
         logger.info(f"Free account created for {request.email}")
 
@@ -217,14 +216,15 @@ async def cancel_subscription(
         subscription = stripe.Subscription.delete(request.subscription_id)
 
         # Update database
-        await db.execute(
-            """
-            UPDATE users
-            SET subscription_plan = 'free', subscription_id = NULL
-            WHERE subscription_id = $1
-            """,
-            request.subscription_id
-        )
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE users
+                SET subscription_plan = 'free', subscription_id = NULL
+                WHERE subscription_id = $1
+                """,
+                request.subscription_id
+            )
 
         logger.info(f"Subscription cancelled: {request.subscription_id}")
 
@@ -278,14 +278,15 @@ async def get_subscription(user_id: str, db: DatabaseAdapter = Depends(get_db)):
     Get subscription details for a user
     """
     try:
-        result = await db.fetchone(
-            """
-            SELECT subscription_plan, subscription_id, stripe_customer_id, created_at
-            FROM users
-            WHERE id = $1
-            """,
-            user_id
-        )
+        async with db.pool.acquire() as conn:
+            result = await conn.fetchrow(
+                """
+                SELECT subscription_plan, subscription_id, stripe_customer_id, created_at
+                FROM users
+                WHERE id = $1
+                """,
+                user_id
+            )
 
         if not result:
             raise HTTPException(status_code=404, detail="User not found")

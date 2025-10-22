@@ -564,12 +564,19 @@
                 }
 
                 // Handle subscription created
-                if (result.status === 'active') {
+                if (result.status === 'active' || result.status === 'incomplete') {
+                    // Store user credentials
+                    localStorage.setItem('user_email', email);
+                    localStorage.setItem('subscription_plan', selectedPlan);
+                    if (result.subscription_id) {
+                        localStorage.setItem('subscription_id', result.subscription_id);
+                    }
+                    
                     showAlert('success', 'Subscription created successfully!');
                     setTimeout(() => {
                         window.location.href = 'index.html?new_user=true';
                     }, 2000);
-                } else {
+                } else if (result.client_secret) {
                     // Handle requires_action (3D Secure)
                     const {error: confirmError} = await stripe.confirmCardPayment(result.client_secret);
 
@@ -577,11 +584,21 @@
                         showAlert('error', confirmError.message);
                         setLoading(false);
                     } else {
+                        // Store user credentials after successful payment confirmation
+                        localStorage.setItem('user_email', email);
+                        localStorage.setItem('subscription_plan', selectedPlan);
+                        if (result.subscription_id) {
+                            localStorage.setItem('subscription_id', result.subscription_id);
+                        }
+                        
                         showAlert('success', 'Payment confirmed! Redirecting...');
                         setTimeout(() => {
                             window.location.href = 'index.html?new_user=true';
                         }, 2000);
                     }
+                } else {
+                    showAlert('error', 'Unexpected response from server.');
+                    setLoading(false);
                 }
             } catch (error) {
                 showAlert('error', 'An error occurred. Please try again.');
@@ -607,9 +624,14 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    // Store user credentials
+                    localStorage.setItem('user_email', email);
+                    localStorage.setItem('user_id', result.user_id);
+                    localStorage.setItem('subscription_plan', 'free');
+                    
                     showAlert('success', 'Account created successfully!');
                     setTimeout(() => {
-                        window.location.href = 'index.html?user_id=' + result.user_id;
+                        window.location.href = 'index.html?new_user=true';
                     }, 2000);
                 } else {
                     showAlert('error', result.error || 'Failed to create account');
