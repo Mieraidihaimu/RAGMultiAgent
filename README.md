@@ -35,6 +35,14 @@ open http://localhost:3000
 
 Visit http://localhost:8000/docs for API documentation.
 
+## Screenshots
+
+### Landing Page
+![Landing Page](screenshots/Screenshot%202025-10-22%20at%2022.24.50.png)
+
+### Thought Analysis Dashboard
+![Dashboard](screenshots/Screenshot%202025-10-22%20at%2022.25.21.png)
+
 ## System Architecture
 
 ```mermaid
