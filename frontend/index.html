@@ -587,68 +587,38 @@
 
         <div class="dashboard" id="dashboard">
             <div class="stat-card">
-                <div class="stat-label">Total Thoughts</div>
-                <div class="stat-value" id="totalThoughts">0</div>
-                <div class="stat-subtitle">Processed & Pending</div>
+                <div class="stat-label">🧘 Anxiety Level</div>
+                <div class="stat-value" id="anxietyLevel">0</div>
+                <div class="stat-subtitle" id="anxietySubtitle">Calm & Stable</div>
             </div>
-            
+
             <div class="stat-card">
-                <div class="stat-label">Avg Strength Level</div>
-                <div class="stat-value" id="avgStrength">0</div>
-                <div class="stat-subtitle">Out of 10</div>
-                <div class="strength-meter">
-                    <div class="meter-bar">
-                        <div class="meter-fill" id="strengthMeter" style="width: 0%"></div>
-                    </div>
-                </div>
+                <div class="stat-label">⚠️ Critical Thoughts</div>
+                <div class="stat-value" id="criticalCount">0</div>
+                <div class="stat-subtitle">Last: <span id="lastCritical">None</span></div>
             </div>
-            
+
             <div class="stat-card">
-                <div class="stat-label">High Priority</div>
-                <div class="stat-value" id="highPriority">0</div>
-                <div class="stat-subtitle">Critical & High Items</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-label">Completion Rate</div>
-                <div class="stat-value" id="completionRate">0%</div>
-                <div class="stat-subtitle">Successfully Processed</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-label">Avg Value Score</div>
-                <div class="stat-value" id="avgValue">0</div>
-                <div class="stat-subtitle">Impact Potential</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-label">Top Category</div>
-                <div class="stat-value" id="topCategory" style="font-size: 1.5rem;">-</div>
-                <div class="stat-subtitle">Most Common Type</div>
+                <div class="stat-label">💭 Mental Clarity</div>
+                <div class="stat-value" id="clarityScore">0%</div>
+                <div class="stat-subtitle" id="nonEssentialCount">Essential thoughts</div>
             </div>
         </div>
 
-        <div class="main-grid">
-            <div class="card">
-                <h2>✨ Submit New Thought</h2>
-                <div class="form-group">
-                    <label for="userId">User ID:</label>
-                    <input type="text" id="userId" placeholder="Enter your user ID" value="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11">
-                </div>
-                <div class="form-group">
-                    <label for="thoughtText">Your Thought:</label>
-                    <textarea id="thoughtText" placeholder="Share your idea, question, or insight..."></textarea>
-                </div>
-                <button onclick="submitThought()">Submit Thought</button>
-                <div id="submitStatus"></div>
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>✨ Submit New Thought</h2>
+            <div class="form-group">
+                <textarea id="thoughtText" placeholder="Share your idea, question, or insight..." style="min-height: 100px;"></textarea>
             </div>
-
-            <div class="card">
-                <h2>⚡ Process Thoughts</h2>
-                <p style="margin-bottom: 15px; color: #a0a0a0;">Trigger the AI batch processor to analyze pending thoughts through our multi-agent pipeline.</p>
-                <button onclick="triggerProcess()">Process Pending Thoughts</button>
-                <div id="processStatus"></div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button onclick="submitThought()" style="flex: 1; min-width: 200px;">Submit Thought</button>
+                <span id="pendingBadge" style="display: none; padding: 8px 16px; background: rgba(251, 191, 36, 0.2); border: 1px solid #fbbf24; border-radius: 20px; color: #fbbf24; font-size: 14px; font-weight: 600;">
+                    <span id="pendingCount">0</span> Pending
+                </span>
+                <button onclick="triggerProcess()" class="btn-secondary" style="min-width: 180px;">⚡ Process All</button>
             </div>
+            <div id="submitStatus"></div>
+            <div id="processStatus"></div>
         </div>
 
         <div class="filters">
@@ -726,14 +696,24 @@
         let allThoughts = [];
         let currentViewMode = 'list';
 
+        // Get or create user ID from localStorage
+        function getUserId() {
+            let userId = localStorage.getItem('thought_user_id');
+            if (!userId) {
+                userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Default user
+                localStorage.setItem('thought_user_id', userId);
+            }
+            return userId;
+        }
+
         async function submitThought() {
-            const userId = document.getElementById('userId').value;
+            const userId = getUserId();
             const thoughtText = document.getElementById('thoughtText').value;
             const statusDiv = document.getElementById('submitStatus');
 
-            if (!userId || !thoughtText) {
+            if (!thoughtText || !thoughtText.trim()) {
                 statusDiv.className = 'status error';
-                statusDiv.textContent = '❌ Please fill in all fields';
+                statusDiv.textContent = '❌ Please enter a thought';
                 return;
             }
 
@@ -783,7 +763,7 @@
 
         async function loadThoughts() {
             try {
-                const userId = document.getElementById('userId').value || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+                const userId = getUserId();
                 const response = await fetch(`${API_BASE}/thoughts/${userId}`);
                 const data = await response.json();
                 allThoughts = data.thoughts || [];
@@ -803,46 +783,60 @@
 
         function updateDashboard() {
             const completed = allThoughts.filter(t => t.status === 'completed');
-            const highPri = allThoughts.filter(t => 
-                t.analysis?.priority === 'critical' || t.analysis?.priority === 'high'
-            );
-            
-            const strengthScores = completed
-                .map(t => t.analysis?.strength_score || 0)
-                .filter(s => s > 0);
-            const avgStrength = strengthScores.length > 0
-                ? (strengthScores.reduce((a, b) => a + b, 0) / strengthScores.length).toFixed(1)
-                : 0;
-            
-            const valueScores = completed
-                .map(t => t.analysis?.value_score || 0)
-                .filter(v => v > 0);
-            const avgValue = valueScores.length > 0
-                ? (valueScores.reduce((a, b) => a + b, 0) / valueScores.length).toFixed(1)
-                : 0;
-            
-            const completionRate = allThoughts.length > 0
-                ? Math.round((completed.length / allThoughts.length) * 100)
-                : 0;
-            
-            const categories = {};
-            completed.forEach(t => {
-                const cat = t.analysis?.classification?.type || 'unknown';
-                categories[cat] = (categories[cat] || 0) + 1;
+            const pending = allThoughts.filter(t => t.status === 'pending');
+
+            // Calculate Anxiety Level
+            const anxietyKeywords = ['stress', 'worry', 'anxious', 'nervous', 'overwhelm', 'panic', 'fear'];
+            const anxiousThoughts = completed.filter(t => {
+                const urgency = t.classification?.urgency || '';
+                const tone = t.classification?.emotional_tone || '';
+                const isHighUrgency = urgency === 'high' || urgency === 'immediate';
+                const isAnxiousTone = anxietyKeywords.some(kw => tone.toLowerCase().includes(kw));
+                return isHighUrgency || isAnxiousTone;
             });
-            const topCategory = Object.keys(categories).length > 0
-                ? Object.keys(categories).reduce((a, b) => categories[a] > categories[b] ? a : b)
-                : '-';
-            
-            document.getElementById('totalThoughts').textContent = allThoughts.length;
-            document.getElementById('avgStrength').textContent = avgStrength;
-            document.getElementById('highPriority').textContent = highPri.length;
-            document.getElementById('completionRate').textContent = completionRate + '%';
-            document.getElementById('avgValue').textContent = avgValue;
-            document.getElementById('topCategory').textContent = topCategory.toUpperCase();
-            
-            const strengthPercent = (avgStrength / 10) * 100;
-            document.getElementById('strengthMeter').style.width = strengthPercent + '%';
+            const anxietyLevel = anxiousThoughts.length;
+            const anxietyColor = anxietyLevel === 0 ? '#34a853' : anxietyLevel <= 2 ? '#fbbf24' : '#dc3545';
+
+            // Calculate Critical Thoughts
+            const criticalThoughts = allThoughts.filter(t => {
+                const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                return priorityLevel === 'critical' || priorityLevel === 'high';
+            });
+            const criticalCount = criticalThoughts.length;
+            const lastCritical = criticalThoughts.length > 0
+                ? new Date(criticalThoughts[0].created_at).toLocaleDateString()
+                : 'None';
+
+            // Calculate Mental Clarity Score (% of essential thoughts)
+            const nonEssentialThoughts = completed.filter(t => {
+                const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                const type = t.classification?.type || '';
+                const urgency = t.classification?.urgency || '';
+                const weightedTotal = t.value_impact?.weighted_total || 0;
+
+                return priorityLevel === 'defer' ||
+                       (type === 'observation' && urgency === 'never') ||
+                       weightedTotal === 0;
+            });
+            const essentialPercentage = completed.length > 0
+                ? Math.round(((completed.length - nonEssentialThoughts.length) / completed.length) * 100)
+                : 0;
+
+            // Update DOM
+            document.getElementById('anxietyLevel').textContent = anxietyLevel;
+            document.getElementById('anxietyLevel').style.color = anxietyColor;
+            document.getElementById('anxietySubtitle').textContent = anxietyLevel === 0 ? 'Calm & Stable' :
+                anxietyLevel <= 2 ? 'Mild Concerns' : 'Needs Attention';
+
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('lastCritical').textContent = lastCritical;
+
+            document.getElementById('clarityScore').textContent = essentialPercentage + '%';
+            document.getElementById('nonEssentialCount').textContent = nonEssentialThoughts.length + ' filtered out';
+
+            // Update pending count badge
+            document.getElementById('pendingCount').textContent = pending.length;
+            document.getElementById('pendingBadge').style.display = pending.length > 0 ? 'inline-block' : 'none';
         }
 
         function applyFilters() {
@@ -857,12 +851,15 @@
                 filtered = filtered.filter(t => t.status === status);
             }
             if (priority !== 'all') {
-                filtered = filtered.filter(t => t.analysis?.priority === priority);
+                filtered = filtered.filter(t => {
+                    const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                    return priorityLevel === priority.toLowerCase();
+                });
             }
             if (category !== 'all') {
-                filtered = filtered.filter(t => t.analysis?.classification?.type === category);
+                filtered = filtered.filter(t => t.classification?.type === category);
             }
-            
+
             filtered.sort((a, b) => {
                 switch (sortBy) {
                     case 'created_desc':
@@ -870,8 +867,10 @@
                     case 'created_asc':
                         return new Date(a.created_at) - new Date(b.created_at);
                     case 'priority_desc':
-                        const priOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-                        return (priOrder[b.analysis?.priority] || 0) - (priOrder[a.analysis?.priority] || 0);
+                        const priOrder = { critical: 4, high: 3, medium: 2, low: 1, defer: 0 };
+                        const aPri = (a.priority?.priority_level?.toLowerCase() || 'defer');
+                        const bPri = (b.priority?.priority_level?.toLowerCase() || 'defer');
+                        return (priOrder[bPri] || 0) - (priOrder[aPri] || 0);
                     case 'value_desc':
                         return (b.analysis?.value_score || 0) - (a.analysis?.value_score || 0);
                     case 'strength_desc':
@@ -921,16 +920,16 @@
             
             container.innerHTML = thoughts.map(thought => {
                 const analysis = thought.analysis || {};
-                const classification = analysis.classification || {};
-                const priority = analysis.priority || 'medium';
+                const classification = thought.classification || {};
+                const priorityLevel = (thought.priority?.priority_level || '').toLowerCase();
                 const valueScore = analysis.value_score || 0;
                 const strengthScore = analysis.strength_score || 0;
-                
+
                 return `
                     <div class="thought-item ${thought.status}" onclick="viewDetails('${thought.user_id}', '${thought.id}')">
                         <div class="thought-header">
                             <span class="thought-status ${thought.status}">${thought.status}</span>
-                            ${analysis.priority ? `<span class="priority-badge priority-${priority}">${priority}</span>` : ''}
+                            ${priorityLevel ? `<span class="priority-badge priority-${priorityLevel}">${priorityLevel}</span>` : ''}
                         </div>
                         <div class="thought-text">${thought.text}</div>
                         <div class="thought-details">
