@@ -39,15 +39,10 @@ class KafkaThoughtProducer:
             return
 
         try:
+            # Use minimal configuration for compatibility
             self.producer = AIOKafkaProducer(
                 bootstrap_servers=self.bootstrap_servers,
-                acks=kafka_config.acks,
-                retries=kafka_config.retries,
-                max_in_flight_requests_per_connection=kafka_config.max_in_flight_requests_per_connection,
                 compression_type=kafka_config.compression_type,
-                batch_size=kafka_config.batch_size,
-                linger_ms=kafka_config.linger_ms,
-                buffer_memory=kafka_config.buffer_memory,
             )
 
             await self.producer.start()

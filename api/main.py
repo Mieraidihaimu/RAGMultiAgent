@@ -39,7 +39,7 @@ if KAFKA_ENABLED:
     try:
         from sse_starlette.sse import EventSourceResponse
         from kafka.producer import get_kafka_producer, close_kafka_producer
-        from api.sse import get_sse_manager, close_sse_manager
+        from sse import get_sse_manager, close_sse_manager
         from models import SSEEvent
         KAFKA_AVAILABLE = True
         logger.info("Kafka streaming enabled")
@@ -230,12 +230,21 @@ async def create_thought(
                 kafka_producer = await get_kafka_producer()
                 sse_manager = await get_sse_manager()
 
+                # Get user context as dict
+                user_context = user.get("context", {})
+                if isinstance(user_context, str):
+                    import json
+                    try:
+                        user_context = json.loads(user_context)
+                    except:
+                        user_context = {}
+
                 # Publish to Kafka topic
                 success = await kafka_producer.send_thought_created(
                     user_id=str(thought.user_id),
                     thought_id=str(thought_data["id"]),
                     text=thought.text,
-                    user_context=user.get("context")
+                    user_context=user_context
                 )
 
                 if success:
