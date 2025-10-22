@@ -354,7 +354,7 @@
         // Get thought ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user_id');
-        const thoughtId = urlParams.get('id');
+        const thoughtId = urlParams.get('thought_id');
         
         if (!userId || !thoughtId) {
             document.getElementById('content').innerHTML = `

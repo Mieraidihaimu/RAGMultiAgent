@@ -3,7 +3,14 @@
     "allow": [
       "Bash(chmod:*)",
       "Bash(tree:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(for page in landing.html checkout.html login.html index.html)",
+      "Bash(do echo -n \"   $page: \")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

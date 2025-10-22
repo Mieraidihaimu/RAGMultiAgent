@@ -633,7 +633,7 @@
                 <h2>✨ Submit New Thought</h2>
                 <div class="form-group">
                     <label for="userId">User ID:</label>
-                    <input type="text" id="userId" placeholder="Enter your user ID" value="user123">
+                    <input type="text" id="userId" placeholder="Enter your user ID" value="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11">
                 </div>
                 <div class="form-group">
                     <label for="thoughtText">Your Thought:</label>
@@ -741,7 +741,7 @@
                 const response = await fetch(`${API_BASE}/thoughts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, thought_text: thoughtText })
+                    body: JSON.stringify({ user_id: userId, text: thoughtText })
                 });
 
                 if (response.ok) {
@@ -783,7 +783,7 @@
 
         async function loadThoughts() {
             try {
-                const userId = document.getElementById('userId').value || 'user123';
+                const userId = document.getElementById('userId').value || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
                 const response = await fetch(`${API_BASE}/thoughts/${userId}`);
                 const data = await response.json();
                 allThoughts = data.thoughts || [];
@@ -927,12 +927,12 @@
                 const strengthScore = analysis.strength_score || 0;
                 
                 return `
-                    <div class="thought-item ${thought.status}" onclick="viewDetails('${thought.user_id}', '${thought.thought_id}')">
+                    <div class="thought-item ${thought.status}" onclick="viewDetails('${thought.user_id}', '${thought.id}')">
                         <div class="thought-header">
                             <span class="thought-status ${thought.status}">${thought.status}</span>
                             ${analysis.priority ? `<span class="priority-badge priority-${priority}">${priority}</span>` : ''}
                         </div>
-                        <div class="thought-text">${thought.thought_text}</div>
+                        <div class="thought-text">${thought.text}</div>
                         <div class="thought-details">
                             <div class="thought-meta">
                                 <span>📅 ${new Date(thought.created_at).toLocaleDateString()}</span>

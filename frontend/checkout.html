@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - AI Thought Processor</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --accent: #f093fb;
+            --dark: #0f0c29;
+            --text-dark: #2d3748;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .checkout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            color: var(--text-dark);
+            margin-bottom: 1.5rem;
+            font-size: 1.75rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-dark);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .plan-summary {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .plan-price span {
+            font-size: 1rem;
+            color: #718096;
+        }
+
+        .features-list {
+            list-style: none;
+            margin: 1.5rem 0;
+        }
+
+        .features-list li {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-dark);
+        }
+
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+
+        .checkmark {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .total-section {
+            background: #f7fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 1.5rem;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+            color: var(--text-dark);
+        }
+
+        .total-row.final {
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding-top: 1rem;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .security-badges {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+        }
+
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            font-size: 0.875rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #card-element {
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+        }
+
+        #card-errors {
+            color: #721c24;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .checkout-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="landing.html" class="back-link">← Back to Home</a>
+
+        <div class="header">
+            <h1>Complete Your Purchase</h1>
+            <p>Start transforming your thoughts today</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="checkout-grid">
+            <!-- Order Summary -->
+            <div class="card">
+                <h2>Order Summary</h2>
+                <div class="plan-summary">
+                    <div class="plan-name" id="planName">Pro Plan</div>
+                    <div class="plan-price" id="planPrice">$19<span>/month</span></div>
+                </div>
+
+                <ul class="features-list" id="featuresList">
+                    <li><span class="checkmark">✓</span> Unlimited thoughts</li>
+                    <li><span class="checkmark">✓</span> Advanced AI analysis</li>
+                    <li><span class="checkmark">✓</span> Priority support</li>
+                    <li><span class="checkmark">✓</span> Weekly synthesis reports</li>
+                    <li><span class="checkmark">✓</span> Export to PDF</li>
+                    <li><span class="checkmark">✓</span> API access</li>
+                </ul>
+
+                <div class="total-section">
+                    <div class="total-row">
+                        <span>Subtotal</span>
+                        <span id="subtotal">$19.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Tax (estimated)</span>
+                        <span id="tax">$0.00</span>
+                    </div>
+                    <div class="total-row final">
+                        <span>Total</span>
+                        <span id="total">$19.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <div class="card">
+                <h2>Payment Details</h2>
+
+                <form id="payment-form">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" required placeholder="you@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" required placeholder="John Doe">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="card-element">Card Information</label>
+                        <div id="card-element"></div>
+                        <div id="card-errors" role="alert"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="terms" required style="width: auto; margin-right: 0.5rem;">
+                            I agree to the <a href="#" style="color: var(--primary);">Terms of Service</a> and <a href="#" style="color: var(--primary);">Privacy Policy</a>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="submit-button">
+                        <span id="button-text">Subscribe Now</span>
+                        <span id="spinner" class="loading" style="display: none;"></span>
+                    </button>
+                </form>
+
+                <div style="margin-top: 1.5rem; text-align: center; color: #718096; font-size: 0.875rem;">
+                    <p>🔒 Secure payment powered by Stripe</p>
+                    <p style="margin-top: 0.5rem;">Cancel anytime. No long-term commitment.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="security-badges">
+            <div class="security-badge">
+                🔒 SSL Encrypted
+            </div>
+            <div class="security-badge">
+                💳 Stripe Secure
+            </div>
+            <div class="security-badge">
+                ✓ PCI Compliant
+            </div>
+            <div class="security-badge">
+                🛡️ Money-back Guarantee
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Plan configurations
+        const plans = {
+            free: {
+                name: 'Free Plan',
+                price: 0,
+                features: [
+                    '10 thoughts per month',
+                    'Basic analysis',
+                    'Email support',
+                    'Dashboard access'
+                ]
+            },
+            pro: {
+                name: 'Pro Plan',
+                price: 19,
+                features: [
+                    'Unlimited thoughts',
+                    'Advanced AI analysis',
+                    'Priority support',
+                    'Weekly synthesis reports',
+                    'Export to PDF',
+                    'API access'
+                ]
+            },
+            enterprise: {
+                name: 'Enterprise Plan',
+                price: 99,
+                features: [
+                    'Everything in Pro',
+                    'Team collaboration',
+                    'Custom AI models',
+                    'Dedicated support',
+                    'SLA guarantee',
+                    'On-premise deployment'
+                ]
+            }
+        };
+
+        // Get selected plan from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedPlan = urlParams.get('plan') || 'pro';
+        const plan = plans[selectedPlan];
+
+        // Update UI with plan details
+        document.getElementById('planName').textContent = plan.name;
+        document.getElementById('planPrice').innerHTML = `$${plan.price}<span>/month</span>`;
+
+        const featuresList = document.getElementById('featuresList');
+        featuresList.innerHTML = plan.features.map(f =>
+            `<li><span class="checkmark">✓</span> ${f}</li>`
+        ).join('');
+
+        const subtotal = plan.price;
+        const tax = (plan.price * 0.08).toFixed(2); // 8% tax
+        const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
+
+        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+        document.getElementById('tax').textContent = `$${tax}`;
+        document.getElementById('total').textContent = `$${total}`;
+
+        // Stripe configuration
+        // IMPORTANT: Replace with your actual Stripe publishable key
+        const STRIPE_PUBLIC_KEY = 'pk_test_YOUR_STRIPE_PUBLISHABLE_KEY';
+
+        let stripe, elements, cardElement;
+
+        // Initialize Stripe (only if not free plan)
+        if (selectedPlan !== 'free') {
+            try {
+                stripe = Stripe(STRIPE_PUBLIC_KEY);
+                elements = stripe.elements();
+
+                cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#2d3748',
+                            '::placeholder': {
+                                color: '#a0aec0',
+                            },
+                        },
+                    },
+                });
+
+                cardElement.mount('#card-element');
+
+                cardElement.on('change', function(event) {
+                    const displayError = document.getElementById('card-errors');
+                    if (event.error) {
+                        displayError.textContent = event.error.message;
+                    } else {
+                        displayError.textContent = '';
+                    }
+                });
+            } catch (error) {
+                showAlert('error', 'Stripe is not configured. Please add your Stripe publishable key.');
+            }
+        }
+
+        // Handle form submission
+        const form = document.getElementById('payment-form');
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+
+            // Handle free plan
+            if (selectedPlan === 'free') {
+                await handleFreePlan(email, name);
+                return;
+            }
+
+            // Handle paid plans with Stripe
+            setLoading(true);
+
+            try {
+                // Create payment method
+                const {error, paymentMethod} = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: {
+                        name: name,
+                        email: email,
+                    },
+                });
+
+                if (error) {
+                    showAlert('error', error.message);
+                    setLoading(false);
+                    return;
+                }
+
+                // Send payment method to your backend
+                const response = await fetch('http://localhost:8000/api/create-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        payment_method_id: paymentMethod.id,
+                        email: email,
+                        name: name,
+                        plan: selectedPlan,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    showAlert('error', result.error);
+                    setLoading(false);
+                    return;
+                }
+
+                // Handle subscription created
+                if (result.status === 'active') {
+                    showAlert('success', 'Subscription created successfully!');
+                    setTimeout(() => {
+                        window.location.href = 'index.html?new_user=true';
+                    }, 2000);
+                } else {
+                    // Handle requires_action (3D Secure)
+                    const {error: confirmError} = await stripe.confirmCardPayment(result.client_secret);
+
+                    if (confirmError) {
+                        showAlert('error', confirmError.message);
+                        setLoading(false);
+                    } else {
+                        showAlert('success', 'Payment confirmed! Redirecting...');
+                        setTimeout(() => {
+                            window.location.href = 'index.html?new_user=true';
+                        }, 2000);
+                    }
+                }
+            } catch (error) {
+                showAlert('error', 'An error occurred. Please try again.');
+                setLoading(false);
+            }
+        });
+
+        async function handleFreePlan(email, name) {
+            setLoading(true);
+
+            try {
+                const response = await fetch('http://localhost:8000/api/create-free-account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        name: name,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('success', 'Account created successfully!');
+                    setTimeout(() => {
+                        window.location.href = 'index.html?user_id=' + result.user_id;
+                    }, 2000);
+                } else {
+                    showAlert('error', result.error || 'Failed to create account');
+                    setLoading(false);
+                }
+            } catch (error) {
+                showAlert('error', 'An error occurred. Please try again.');
+                setLoading(false);
+            }
+        }
+
+        function setLoading(isLoading) {
+            const submitButton = document.getElementById('submit-button');
+            const buttonText = document.getElementById('button-text');
+            const spinner = document.getElementById('spinner');
+
+            submitButton.disabled = isLoading;
+            buttonText.style.display = isLoading ? 'none' : 'inline';
+            spinner.style.display = isLoading ? 'inline-block' : 'none';
+        }
+
+        function showAlert(type, message) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+
+            alertContainer.innerHTML = `
+                <div class="alert ${alertClass}" style="max-width: 600px; margin: 0 auto 2rem;">
+                    ${message}
+                </div>
+            `;
+
+            // Auto-dismiss success alerts
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertContainer.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Show info for demo
+        if (selectedPlan !== 'free') {
+            showAlert('info', 'Demo Mode: Use test card 4242 4242 4242 4242 with any future date and CVC');
+        }
+    </script>
+</body>
+</html>

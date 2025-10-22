@@ -26,6 +26,14 @@ from models import (
 from database import get_db
 from common.database.base import DatabaseAdapter
 
+# Import payment routes
+try:
+    from payment_routes import router as payment_router
+    PAYMENT_ROUTES_AVAILABLE = True
+except ImportError:
+    PAYMENT_ROUTES_AVAILABLE = False
+    logger.warning("Payment routes not available - stripe package may not be installed")
+
 # Configure logging
 logger.add(
     "logs/api.log",
@@ -51,6 +59,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include payment routes if available
+if PAYMENT_ROUTES_AVAILABLE:
+    app.include_router(payment_router)
+    logger.info("Payment routes enabled")
 
 
 @app.get("/", tags=["Health"])
