@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+        .event {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+        .connected { border-left-color: #34a853; background: rgba(52, 168, 83, 0.1); }
+        .error { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.1); }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #764ba2; }
+        input {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #667eea;
+            background: #16213e;
+            color: #eee;
+            width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔴 SSE Connection Test</h1>
+    
+    <div style="margin: 20px 0;">
+        <input type="text" id="userId" placeholder="Enter User ID" />
+        <input type="text" id="token" placeholder="Enter Auth Token" />
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+    
+    <div id="status">Not connected</div>
+    <div id="events"></div>
+
+    <script>
+        let eventSource = null;
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            const token = document.getElementById('token').value;
+            
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const url = `http://localhost:8000/events/${userId}${token ? '?token=' + encodeURIComponent(token) : ''}`;
+            
+            addEvent('Connecting to: ' + url, 'info');
+            
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = function() {
+                document.getElementById('status').innerHTML = '🟢 Connected';
+                addEvent('SSE Connection opened', 'connected');
+            };
+
+            eventSource.addEventListener('connected', function(e) {
+                const data = JSON.parse(e.data);
+                addEvent('Connected event: ' + JSON.stringify(data, null, 2), 'connected');
+            });
+
+            eventSource.addEventListener('thought_created', function(e) {
+                const data = JSON.parse(e.data);
+                addEvent('Thought Created: ' + JSON.stringify(data, null, 2), 'event');
+            });
+
+            eventSource.addEventListener('thought_processing', function(e) {
+                const data = JSON.parse(e.data);
+                addEvent('Processing: ' + JSON.stringify(data, null, 2), 'event');
+            });
+
+            eventSource.addEventListener('thought_agent_completed', function(e) {
+                const data = JSON.parse(e.data);
+                addEvent('Agent Completed: ' + JSON.stringify(data, null, 2), 'event');
+            });
+
+            eventSource.addEventListener('thought_completed', function(e) {
+                const data = JSON.parse(e.data);
+                addEvent('Completed: ' + JSON.stringify(data, null, 2), 'event');
+            });
+
+            eventSource.onerror = function(error) {
+                document.getElementById('status').innerHTML = '🔴 Error/Disconnected';
+                addEvent('Error: ' + JSON.stringify(error), 'error');
+                console.error('SSE Error:', error);
+            };
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                document.getElementById('status').innerHTML = '⚪ Disconnected';
+                addEvent('Disconnected by user', 'info');
+            }
+        }
+
+        function addEvent(message, type = 'event') {
+            const eventsDiv = document.getElementById('events');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event ' + type;
+            eventDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong><br>${message}`;
+            eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+            
+            // Keep only last 50 events
+            while (eventsDiv.children.length > 50) {
+                eventsDiv.removeChild(eventsDiv.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

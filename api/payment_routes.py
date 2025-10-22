@@ -20,6 +20,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 router = APIRouter(prefix="/api", tags=["Payments"])
 
 # Pydantic models
+class StripeConfigResponse(BaseModel):
+    publishable_key: str
+
 class CreateSubscriptionRequest(BaseModel):
     payment_method_id: str
     email: EmailStr
@@ -49,6 +52,23 @@ PLAN_PRICES = {
     'pro': 1900,  # $19.00
     'enterprise': 9900  # $99.00
 }
+
+@router.get("/stripe-config", response_model=StripeConfigResponse)
+async def get_stripe_config():
+    """
+    Get Stripe publishable key for frontend
+    This is safe to expose as it's a public key
+    """
+    publishable_key = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+    
+    if not publishable_key:
+        logger.warning("Stripe publishable key not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Payment system not configured"
+        )
+    
+    return StripeConfigResponse(publishable_key=publishable_key)
 
 @router.post("/create-subscription", response_model=SubscriptionResponse)
 async def create_subscription(

@@ -444,14 +444,27 @@
         document.getElementById('total').textContent = `$${total}`;
 
         // Stripe configuration
-        // IMPORTANT: Replace with your actual Stripe publishable key
-        const STRIPE_PUBLIC_KEY = 'pk_test_YOUR_STRIPE_PUBLISHABLE_KEY';
-
         let stripe, elements, cardElement;
+        let STRIPE_PUBLIC_KEY = null;
 
         // Initialize Stripe (only if not free plan)
-        if (selectedPlan !== 'free') {
+        async function initializeStripe() {
+            if (selectedPlan === 'free') {
+                return;
+            }
+
             try {
+                // Fetch Stripe publishable key from backend
+                const configResponse = await fetch('http://localhost:8000/api/stripe-config');
+                
+                if (!configResponse.ok) {
+                    throw new Error('Failed to load Stripe configuration');
+                }
+                
+                const config = await configResponse.json();
+                STRIPE_PUBLIC_KEY = config.publishable_key;
+                
+                // Initialize Stripe with the key from backend
                 stripe = Stripe(STRIPE_PUBLIC_KEY);
                 elements = stripe.elements();
 
@@ -477,10 +490,16 @@
                         displayError.textContent = '';
                     }
                 });
+                
+                console.log('Stripe initialized successfully with key:', STRIPE_PUBLIC_KEY.substring(0, 20) + '...');
             } catch (error) {
-                showAlert('error', 'Stripe is not configured. Please add your Stripe publishable key.');
+                console.error('Failed to initialize Stripe:', error);
+                showAlert('error', 'Failed to load payment system. Please try again later.');
             }
         }
+
+        // Initialize Stripe on page load
+        initializeStripe();
 
         // Handle form submission
         const form = document.getElementById('payment-form');
@@ -493,6 +512,12 @@
             // Handle free plan
             if (selectedPlan === 'free') {
                 await handleFreePlan(email, name);
+                return;
+            }
+
+            // Check if Stripe is initialized
+            if (!stripe || !cardElement) {
+                showAlert('error', 'Payment system not ready. Please refresh the page.');
                 return;
             }
 
