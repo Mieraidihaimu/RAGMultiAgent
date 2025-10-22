@@ -1,391 +1,258 @@
 # AI Thought Processor
 
-> **⚡ Built with AI Vibes** - This project was thoroughly vibe-coded with AI assistance, iterating through ideas and implementations to create a functional multi-agent thought processing system.
-
-A Docker-based AI system that analyzes personal thoughts using a 5-agent pipeline with semantic caching. Supports multiple AI providers (Anthropic Claude, OpenAI, Google Gemini).
+A scalable AI system for analyzing thoughts using a 5-agent pipeline with Kafka streaming, real-time updates via SSE, and semantic caching.
 
 ## Features
 
 - **5-Agent Pipeline**: Classification → Analysis → Value Assessment → Action Planning → Prioritization
-- **Multi-Provider Support**: Use Anthropic Claude, OpenAI GPT, or Google Gemini
-- **Semantic Caching**: Avoid processing similar thoughts twice (pgvector)
-- **Docker Everything**: API + Database + Batch Processor all containerized
-- **REST API**: FastAPI backend with automatic documentation
+- **Real-Time Updates**: Server-Sent Events (SSE) for live progress tracking
+- **Event-Driven Architecture**: Kafka for scalable message processing with 3 partitions
+- **Multi-Provider AI**: Support for Anthropic Claude, OpenAI GPT, Google Gemini
+- **Semantic Caching**: pgvector-powered caching to avoid reprocessing similar thoughts
+- **Anonymous Users**: Rate-limited (3 thoughts) for unauthenticated access
+- **Payment Integration**: Stripe subscriptions (Free/Pro/Enterprise tiers)
+- **Comprehensive Testing**: 27 integration tests including direct Kafka producer/consumer validation
 
 ## Quick Start
 
-### Prerequisites
-
-- Docker & Docker Compose
-- API key for your chosen provider:
-  - **Google Gemini** (recommended, cheapest): Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
-  - **Anthropic Claude**: From [Anthropic Console](https://console.anthropic.com/)
-  - **OpenAI**: From [OpenAI Platform](https://platform.openai.com/)
-
-### Setup & Run
-
 ```bash
-# 1. Clone the repo
+# 1. Clone and setup
 git clone https://github.com/Mieraidihaimu/RAGMultiAgent.git
 cd RAGMultiAgent
-
-# 2. Create .env file
 cp .env.example .env
 
-# 3. Edit .env and add your API key
-# For Google Gemini (recommended):
+# 2. Add your AI API key to .env
+# Google Gemini (recommended): https://aistudio.google.com/app/apikey
 AI_PROVIDER=google
 GOOGLE_API_KEY=your-key-here
 
-# 4. Start everything
+# 3. Start services
 docker compose up -d
 
-# 5. Open the web UI
+# 4. Open web UI
 open http://localhost:3000
-
-# Or check the API is working
-curl http://localhost:8000/health
 ```
 
-### Using the Frontend
-
-1. Open http://localhost:3000 in your browser
-2. Enter a thought (e.g., "Should I learn Rust or Go?")
-3. Click "Submit Thought"
-4. Wait ~10 seconds or click "Process Pending Thoughts"
-5. Click "🔄 Refresh" to see your analyzed thought with AI insights
-
-### Using the API
-
-```bash
-# Create a thought
-curl -X POST http://localhost:8000/thoughts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Should I switch careers to AI/ML? I have 5 years of web dev experience.",
-    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-  }'
-
-# Process it through the AI pipeline
-docker compose exec batch-processor python processor.py
-
-# View the analysis
-curl http://localhost:8000/thoughts/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11 | python -m json.tool
-```
+Visit http://localhost:8000/docs for API documentation.
 
 ## System Architecture
 
-### High-Level Architecture
-
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        UI[Web UI<br/>Port 3000]
+    subgraph "Frontend"
+        UI[Web UI :3000]
     end
     
     subgraph "API Layer"
-        API[FastAPI Server<br/>Port 8000]
+        API[FastAPI :8000]
+        SSE[SSE Endpoint]
     end
     
-    subgraph "Processing Layer"
-        BP[Batch Processor<br/>Continuous Mode]
-        CACHE[Semantic Cache<br/>pgvector]
+    subgraph "Message Broker"
+        KAFKA[Kafka<br/>3 Partitions]
     end
     
-    subgraph "AI Providers"
-        GEMINI[Google Gemini]
-        CLAUDE[Anthropic Claude]
-        GPT[OpenAI GPT]
+    subgraph "Processing"
+        W1[Worker 1]
+        W2[Worker 2]
+        W3[Worker 3]
+        CACHE[Semantic Cache]
     end
     
-    subgraph "Data Layer"
-        DB[(PostgreSQL<br/>+ pgvector)]
+    subgraph "Data"
+        DB[(PostgreSQL<br/>+pgvector)]
+        REDIS[(Redis)]
     end
     
-    UI -->|REST API| API
-    API -->|CRUD| DB
-    BP -->|Read/Write| DB
-    BP -->|Check Cache| CACHE
-    CACHE -->|Vector Search| DB
-    BP -->|Generate| GEMINI
-    BP -->|Generate| CLAUDE
-    BP -->|Generate| GPT
+    subgraph "AI"
+        AI[Gemini/Claude/GPT]
+    end
     
-    style UI fill:#667eea,color:#fff
-    style API fill:#764ba2,color:#fff
-    style BP fill:#f093fb,color:#fff
-    style DB fill:#4facfe,color:#fff
-    style GEMINI fill:#34a853,color:#fff
-    style CLAUDE fill:#f97316,color:#fff
-    style GPT fill:#10b981,color:#fff
+    UI -->|Submit Thought| API
+    UI -->|Listen Updates| SSE
+    API -->|Produce Event| KAFKA
+    KAFKA -->|Consume| W1 & W2 & W3
+    W1 & W2 & W3 -->|Check Cache| CACHE
+    W1 & W2 & W3 -->|Process| AI
+    W1 & W2 & W3 -->|Publish Progress| REDIS
+    SSE -->|Stream Events| REDIS
+    API & W1 & W2 & W3 <-->|Read/Write| DB
+    CACHE <-->|Vector Search| DB
 ```
 
-### Data Flow Diagram
+### Data Flow
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Frontend
     participant API
-    participant DB
-    participant BatchProcessor
-    participant Cache
+    participant Kafka
+    participant Worker
+    participant Redis
+    participant SSE
     participant AI
     
-    User->>Frontend: Submit thought
-    Frontend->>API: POST /thoughts
-    API->>DB: INSERT thought (status: pending)
-    API-->>Frontend: 201 Created
-    Frontend-->>User: Thought saved!
+    User->>API: POST /thoughts
+    API->>DB: Save thought (pending)
+    API->>Kafka: Produce ThoughtCreated event
+    API-->>User: 201 + session_id
     
-    Note over BatchProcessor: Runs every 10s
+    User->>SSE: Connect /events/{session_id}
     
-    BatchProcessor->>DB: Get pending thoughts
-    DB-->>BatchProcessor: List of thoughts
+    Worker->>Kafka: Consume event
+    Worker->>Redis: Publish "processing"
+    SSE-->>User: status: processing
     
-    BatchProcessor->>Cache: Check semantic similarity
-    alt Cache Hit
-        Cache-->>BatchProcessor: Cached result
-    else Cache Miss
-        BatchProcessor->>AI: Process through 5-agent pipeline
-        AI-->>BatchProcessor: Analysis result
-        BatchProcessor->>Cache: Save to cache
-    end
+    Worker->>AI: 5-agent pipeline
+    AI-->>Worker: Analysis
     
-    BatchProcessor->>DB: UPDATE thought (status: completed)
+    Worker->>Redis: Publish "agent_completed" (5x)
+    SSE-->>User: progress updates
     
-    User->>Frontend: View results
-    Frontend->>API: GET /thoughts/{user_id}
-    API->>DB: SELECT thoughts
-    DB-->>API: Thought with analysis
-    API-->>Frontend: JSON response
-    Frontend-->>User: Display analysis
+    Worker->>DB: Save results
+    Worker->>Redis: Publish "completed"
+    SSE-->>User: status: completed
 ```
 
-### 5-Agent Processing Pipeline
+## API Overview
 
-```mermaid
-graph LR
-    START([Thought Input]) --> A1
-    
-    subgraph "5-Agent Pipeline"
-        A1[Agent 1<br/>Classifier]
-        A2[Agent 2<br/>Analyzer]
-        A3[Agent 3<br/>Value Assessor]
-        A4[Agent 4<br/>Action Planner]
-        A5[Agent 5<br/>Prioritizer]
-        
-        A1 -->|Type, Urgency<br/>Emotional Tone| A2
-        A2 -->|Core Issue<br/>Context Analysis| A3
-        A3 -->|Value Scores<br/>6 Dimensions| A4
-        A4 -->|Action Steps<br/>Quick Wins| A5
-        A5 -->|Priority Level<br/>Reasoning| END
-    end
-    
-    END([Complete Analysis])
-    
-    style A1 fill:#667eea,color:#fff
-    style A2 fill:#764ba2,color:#fff
-    style A3 fill:#f093fb,color:#fff
-    style A4 fill:#4facfe,color:#fff
-    style A5 fill:#00f2fe,color:#fff
-    style START fill:#34a853,color:#fff
-    style END fill:#f97316,color:#fff
-```
+Visit **http://localhost:8000/docs** for interactive API documentation.
 
-### Database Schema
+### Key Endpoints
 
-```mermaid
-erDiagram
-    USERS ||--o{ THOUGHTS : creates
-    USERS ||--o{ THOUGHT_CACHE : owns
-    USERS ||--o{ WEEKLY_SYNTHESIS : receives
-    
-    USERS {
-        uuid id PK
-        string email
-        jsonb context
-        int context_version
-        timestamp created_at
-    }
-    
-    THOUGHTS {
-        uuid id PK
-        uuid user_id FK
-        string text
-        string status
-        timestamp created_at
-        timestamp processed_at
-        jsonb classification
-        jsonb analysis
-        jsonb value_impact
-        jsonb action_plan
-        jsonb priority
-        vector embedding
-    }
-    
-    THOUGHT_CACHE {
-        uuid id PK
-        uuid user_id FK
-        string thought_text
-        vector embedding
-        jsonb response
-        int hit_count
-        timestamp expires_at
-    }
-    
-    WEEKLY_SYNTHESIS {
-        uuid id PK
-        uuid user_id FK
-        date week_start
-        date week_end
-        jsonb synthesis
-        timestamp created_at
-    }
-```
+- `POST /anonymous/thoughts` - Submit thought (anonymous, rate-limited)
+- `POST /signup` - Create account
+- `POST /login` - Authenticate
+- `GET /events/{session_id}` - SSE stream for real-time updates
+- `GET /api/stripe-config` - Get Stripe publishable key
+- `GET /health` - System health check
 
-## How It Works
+### 5-Agent Pipeline
 
-### The 5-Agent Pipeline
+1. **Classifier** - Type, urgency, emotional tone
+2. **Analyzer** - Context analysis based on user profile
+3. **Value Assessor** - Impact across life dimensions
+4. **Action Planner** - Concrete steps with timing
+5. **Prioritizer** - Priority level + reasoning
 
-Your thought goes through 5 specialized AI agents:
-
-1. **Classifier** - Extracts type, urgency, emotional tone, entities
-2. **Analyzer** - Provides deep context based on your goals and constraints
-3. **Value Assessor** - Rates impact across 5 life dimensions (career, health, family, etc.)
-4. **Action Planner** - Creates concrete, actionable steps with timing
-5. **Prioritizer** - Determines priority level (Critical/High/Medium/Low)
-
-**Processing time**: ~18 seconds per thought (with Google Gemini)
-
-### API Endpoints
-
-**Interactive docs**: http://localhost:8000/docs
-
-- `POST /thoughts` - Create a thought
-- `GET /thoughts/{user_id}` - List thoughts
-- `GET /thoughts/{user_id}/{thought_id}` - Get specific thought
-- `GET /health` - Check system status
+Processing time: ~15-20 seconds with Gemini
 
 ## Configuration
 
-## Configuration
-
-### Switch AI Providers
-
-Edit `.env`:
+### Environment Variables (.env)
 
 ```bash
-# Google Gemini (cheapest, fast)
-AI_PROVIDER=google
-GOOGLE_API_KEY=your-key-here
-GOOGLE_MODEL=gemini-2.5-flash-lite
+# AI Provider (choose one)
+AI_PROVIDER=google                    # google | anthropic | openai
+GOOGLE_API_KEY=your_key
+GOOGLE_MODEL=gemini-2.0-flash-exp
 
-# Anthropic Claude (best quality)
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
+# Database
+DATABASE_URL=postgresql://user:pass@db:5432/thoughtprocessor
 
-# OpenAI GPT (alternative)
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4-turbo-preview
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+KAFKA_ENABLED=true
+
+# Redis
+REDIS_URL=redis://redis:6379
+
+# Stripe (optional)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-### User Context
+### Switching AI Providers
 
-Users need a context profile for personalized analysis. See `database/seeds/001_sample_user.sql` for an example.
+| Provider | Cost/Month* | Speed | Quality |
+|----------|-------------|-------|---------|
+| Google Gemini | ~$3 | Fast | Good |
+| Anthropic Claude | ~$17 | Medium | Best |
+| OpenAI GPT-4 | ~$30 | Medium | Great |
+
+*Estimated for 20 thoughts/day with caching
 
 ## Project Structure
 
 ```
 RAGMultiAgent/
-├── api/                      # FastAPI backend
-│   ├── main.py              # API routes
-│   └── database.py          # DB adapter
-├── batch_processor/         # AI pipeline
-│   ├── agents.py            # 5-agent logic
-│   ├── processor.py         # Batch orchestration
-│   ├── ai_providers/        # Multi-provider support
-│   └── semantic_cache.py    # Caching layer
-├── common/database/         # Shared DB adapters
-├── database/                # Schema & seeds
-└── docker-compose.yml       # Container setup
+├── api/                  # FastAPI backend
+│   ├── main.py          # Routes + SSE
+│   ├── auth_routes.py   # Authentication
+│   └── payment_routes.py # Stripe integration
+├── batch_processor/     # Kafka consumers (3 workers)
+│   ├── agents.py        # 5-agent pipeline
+│   └── processor.py     # Event processing
+├── kafka/               # Kafka producer/consumer
+│   ├── producer.py      # Event publishing
+│   ├── consumer.py      # Event consumption
+│   └── events.py        # Event schemas
+├── frontend/            # Web UI
+├── tests/               # Integration tests (27 tests)
+└── docker-compose.yml   # Service orchestration
 ```
 
-## Costs (Estimated for 20 thoughts/day)
+## Testing
 
-- **Google Gemini**: ~$3/month ⭐ (recommended)
-- **Anthropic Claude**: ~$17-24/month
-- **OpenAI GPT-4**: ~$30-40/month
+```bash
+# Run all 27 integration tests
+docker-compose --profile test run --rm integration-tests pytest -v
 
-*With semantic caching enabled*
+# Run specific test suite
+docker-compose --profile test run --rm integration-tests pytest test_kafka_direct.py -v
+```
+
+Test coverage:
+- Health checks (2 tests)
+- Anonymous user workflow (4 tests)
+- Database operations (4 tests)
+- Stripe integration (3 tests)
+- Kafka integration - indirect (5 tests)
+- Kafka integration - direct (9 tests)
+
+See [tests/README.md](tests/README.md) for details.
 
 ## Common Commands
 
 ```bash
-# Start/stop
+# Start/stop services
 docker compose up -d
 docker compose down
 
 # View logs
 docker compose logs -f api
-docker compose logs -f batch-processor
+docker compose logs -f kafka-worker
 
-# Rebuild after code changes
+# Rebuild after changes
 docker compose up -d --build
 
-# Process thoughts manually
-docker compose exec batch-processor python processor.py
+# Run integration tests
+docker-compose --profile test run --rm integration-tests
 
 # Database console
-docker compose exec db psql -U thoughtprocessor -d thoughtprocessor
+docker compose exec db psql -U thoughtprocessor
 ```
-
-## Troubleshooting
-
-## Troubleshooting
-
-**API not responding?**
-```bash
-docker compose logs api
-docker compose restart api
-```
-
-**Database issues?**
-```bash
-docker compose logs db
-docker compose restart db
-```
-
-**Agent pipeline failing?**
-- Check your API key is correct in `.env`
-- Verify you have credits with your AI provider
-- Check logs: `docker compose logs batch-processor`
 
 ## Documentation
 
-- `QUICKSTART_GEMINI.md` - Detailed Google Gemini setup
-- `ARCHITECTURE.md` - System design details
-- `ADAPTER_PATTERN_GUIDE.md` - Multi-provider implementation
+- [QUICK_START.md](QUICK_START.md) - Detailed getting started guide
+- [tests/README.md](tests/README.md) - Integration test documentation
+- [SAAS_SETUP.md](SAAS_SETUP.md) - Payment & subscription setup
 
-## Acknowledgments
+## Tech Stack
 
-Built with love and AI assistance ❤️
-
-**AI Providers:**
-- [Google Gemini](https://ai.google.dev/) - Fast & affordable
-- [Anthropic Claude](https://anthropic.com) - Best reasoning
-- [OpenAI GPT](https://openai.com) - Industry standard
-
-**Tech Stack:**
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [PostgreSQL](https://postgresql.org) + [pgvector](https://github.com/pgvector/pgvector) - Vector database
-- [Docker](https://docker.com) - Containerization
+- **Backend**: FastAPI, Python 3.11
+- **Database**: PostgreSQL + pgvector
+- **Message Broker**: Apache Kafka (KRaft mode)
+- **Cache**: Redis (SSE pub/sub)
+- **Frontend**: HTML/JS, nginx
+- **Payments**: Stripe
+- **AI**: Google Gemini / Anthropic Claude / OpenAI GPT
+- **Infrastructure**: Docker Compose
 
 ---
 
 **License**: MIT  
-**Version**: 1.0.0
+**Version**: 2.0.0
 
-*This project was vibe-coded through iterative AI collaboration* 🤖✨
+Built with ❤️ and AI collaboration
