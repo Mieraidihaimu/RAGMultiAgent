@@ -360,10 +360,22 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // Store user info
-                    localStorage.setItem('user_id', result.user_id);
+                    // Store auth token and user info
+                    localStorage.setItem('auth_token', result.access_token);
                     localStorage.setItem('user_email', email);
-                    localStorage.setItem('auth_token', result.token);
+
+                    // Fetch user info to get user_id
+                    const userResponse = await fetch(`${API_BASE}/api/auth/me`, {
+                        headers: {
+                            'Authorization': `Bearer ${result.access_token}`
+                        }
+                    });
+
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+                        localStorage.setItem('user_id', userData.id);
+                        localStorage.setItem('thought_user_id', userData.id);
+                    }
 
                     showAlert('success', 'Login successful! Redirecting...');
 
@@ -371,19 +383,13 @@
                         window.location.href = 'index.html';
                     }, 1000);
                 } else {
-                    showAlert('error', result.error || 'Login failed');
+                    showAlert('error', result.detail || 'Incorrect email or password');
                     setLoading('login', false);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showAlert('error', 'An error occurred. Using demo mode...');
-
-                // Demo fallback
-                localStorage.setItem('user_id', 'user123');
-                localStorage.setItem('user_email', email);
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 1000);
+                showAlert('error', 'Connection error. Please check if the API is running.');
+                setLoading('login', false);
             }
         }
 
@@ -402,6 +408,13 @@
 
             setLoading('signup', true);
 
+            if (password.length < 8) {
+                showAlert('error', 'Password must be at least 8 characters');
+                return;
+            }
+
+            setLoading('signup', true);
+
             try {
                 const response = await fetch(`${API_BASE}/api/auth/signup`, {
                     method: 'POST',
@@ -414,28 +427,23 @@
                 if (response.ok) {
                     showAlert('success', 'Account created! Redirecting...');
 
+                    // Store auth token and user info
+                    localStorage.setItem('auth_token', result.access_token);
                     localStorage.setItem('user_id', result.user_id);
-                    localStorage.setItem('user_email', email);
-                    localStorage.setItem('auth_token', result.token);
+                    localStorage.setItem('user_email', result.email);
+                    localStorage.setItem('thought_user_id', result.user_id);
 
                     setTimeout(() => {
-                        window.location.href = 'checkout.html?plan=free';
+                        window.location.href = 'index.html';
                     }, 1000);
                 } else {
-                    showAlert('error', result.error || 'Signup failed');
+                    showAlert('error', result.detail || 'Signup failed');
                     setLoading('signup', false);
                 }
             } catch (error) {
                 console.error('Signup error:', error);
-                showAlert('error', 'An error occurred. Using demo mode...');
-
-                // Demo fallback
-                const userId = 'user_' + Date.now();
-                localStorage.setItem('user_id', userId);
-                localStorage.setItem('user_email', email);
-                setTimeout(() => {
-                    window.location.href = 'checkout.html?plan=free';
-                }, 1000);
+                showAlert('error', 'Connection error. Please check if the API is running.');
+                setLoading('signup', false);
             }
         }
 

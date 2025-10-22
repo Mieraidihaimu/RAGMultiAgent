@@ -581,7 +581,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧠 AI Thought Processor</h1>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h1 style="margin: 0;">🧠 AI Thought Processor</h1>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <span id="userEmail" style="color: #a0a0a0; font-size: 0.9rem;"></span>
+                    <button onclick="logout()" style="padding: 8px 20px; width: auto; font-size: 14px; background: rgba(220, 53, 69, 0.2); border: 1px solid #dc3545; color: #f87171;">
+                        Logout
+                    </button>
+                </div>
+            </div>
             <p>Capture, Analyze, and Transform Your Ideas with Multi-Agent Intelligence</p>
         </div>
 
@@ -696,18 +704,63 @@
         let allThoughts = [];
         let currentViewMode = 'list';
 
+        // Check if user is authenticated on page load
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            const userId = localStorage.getItem('user_id');
+            
+            if (!token || !userId) {
+                // Redirect to login if not authenticated
+                window.location.href = 'login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Get authentication headers
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
         // Get or create user ID from localStorage
         function getUserId() {
-            let userId = localStorage.getItem('thought_user_id');
+            let userId = localStorage.getItem('user_id') || localStorage.getItem('thought_user_id');
             if (!userId) {
-                userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Default user
-                localStorage.setItem('thought_user_id', userId);
+                // If no user ID, redirect to login
+                window.location.href = 'login.html';
+                return null;
             }
             return userId;
         }
 
+        // Handle logout
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('thought_user_id');
+            window.location.href = 'login.html';
+        }
+
+        // Check authentication on page load
+        if (!checkAuth()) {
+            // Will redirect to login
+        } else {
+            // Display user email
+            const userEmail = localStorage.getItem('user_email');
+            if (userEmail) {
+                document.getElementById('userEmail').textContent = userEmail;
+            }
+        }
+
         async function submitThought() {
             const userId = getUserId();
+            if (!userId) return;
+
             const thoughtText = document.getElementById('thoughtText').value;
             const statusDiv = document.getElementById('submitStatus');
 
@@ -720,9 +773,15 @@
             try {
                 const response = await fetch(`${API_BASE}/thoughts`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ user_id: userId, text: thoughtText })
                 });
+
+                if (response.status === 401) {
+                    // Token expired or invalid
+                    logout();
+                    return;
+                }
 
                 if (response.ok) {
                     statusDiv.className = 'status success';
@@ -745,8 +804,14 @@
 
             try {
                 const response = await fetch(`${API_BASE}/process/trigger`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: getAuthHeaders()
                 });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
 
                 if (response.ok) {
                     statusDiv.className = 'status success';
@@ -764,7 +829,17 @@
         async function loadThoughts() {
             try {
                 const userId = getUserId();
-                const response = await fetch(`${API_BASE}/thoughts/${userId}`);
+                if (!userId) return;
+
+                const response = await fetch(`${API_BASE}/thoughts/${userId}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
                 const data = await response.json();
                 allThoughts = data.thoughts || [];
                 

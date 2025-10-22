@@ -7,9 +7,12 @@ from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from loguru import logger
 
 from models import (
@@ -26,6 +29,15 @@ from models import (
 from database import get_db
 from common.database.base import DatabaseAdapter
 
+# Import authentication
+try:
+    from auth_routes import router as auth_router
+    from auth import get_current_user, TokenData
+    AUTH_AVAILABLE = True
+except ImportError:
+    AUTH_AVAILABLE = False
+    logger.warning("Auth routes not available")
+
 # Import payment routes
 try:
     from payment_routes import router as payment_router
@@ -33,6 +45,9 @@ try:
 except ImportError:
     PAYMENT_ROUTES_AVAILABLE = False
     logger.warning("Payment routes not available - stripe package may not be installed")
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 # Configure logging
 logger.add(
@@ -51,6 +66,10 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -59,6 +78,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include authentication routes
+if AUTH_AVAILABLE:
+    app.include_router(auth_router)
+    logger.info("Authentication routes enabled")
 
 # Include payment routes if available
 if PAYMENT_ROUTES_AVAILABLE:
@@ -103,6 +127,7 @@ async def health_check(db: DatabaseAdapter = Depends(get_db)):
 )
 async def create_thought(
     thought: ThoughtInput,
+    current_user: TokenData = Depends(get_current_user) if AUTH_AVAILABLE else None,
     db: DatabaseAdapter = Depends(get_db)
 ):
     """
@@ -110,8 +135,18 @@ async def create_thought(
 
     The thought will be saved with 'pending' status and processed
     during the next nightly batch run.
+    
+    Requires authentication.
     """
     try:
+        # If auth is enabled, verify the user_id matches the authenticated user
+        if AUTH_AVAILABLE and current_user:
+            if str(thought.user_id) != current_user.user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot create thoughts for other users"
+                )
+        
         # Verify user exists
         user = await db.get_user(str(thought.user_id))
         if not user:
@@ -155,6 +190,7 @@ async def create_thought(
 )
 async def get_thoughts(
     user_id: UUID,
+    current_user: TokenData = Depends(get_current_user) if AUTH_AVAILABLE else None,
     status: Optional[str] = Query(None, description="Filter by status: pending, processing, completed, failed"),
     limit: int = Query(50, ge=1, le=100, description="Number of thoughts to return"),
     offset: int = Query(0, ge=0, description="Number of thoughts to skip"),
@@ -162,8 +198,18 @@ async def get_thoughts(
 ):
     """
     Get thoughts for a specific user with optional filtering
+    
+    Requires authentication - users can only access their own thoughts.
     """
     try:
+        # If auth is enabled, verify the user_id matches the authenticated user
+        if AUTH_AVAILABLE and current_user:
+            if str(user_id) != current_user.user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot access other users' thoughts"
+                )
+        
         if status and status not in ["pending", "processing", "completed", "failed"]:
             raise HTTPException(
                 status_code=400,
@@ -202,10 +248,23 @@ async def get_thoughts(
 async def get_thought(
     user_id: UUID,
     thought_id: UUID,
+    current_user: TokenData = Depends(get_current_user) if AUTH_AVAILABLE else None,
     db: DatabaseAdapter = Depends(get_db)
 ):
-    """Get a specific thought by ID"""
+    """
+    Get a specific thought by ID
+    
+    Requires authentication - users can only access their own thoughts.
+    """
     try:
+        # If auth is enabled, verify the user_id matches the authenticated user
+        if AUTH_AVAILABLE and current_user:
+            if str(user_id) != current_user.user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot access other users' thoughts"
+                )
+        
         thought = await db.get_thought(
             thought_id=str(thought_id),
             user_id=str(user_id)

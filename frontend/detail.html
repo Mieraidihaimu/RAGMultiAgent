@@ -12,94 +12,42 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            color: #e0e0e0;
             padding: 20px;
-            position: relative;
-            overflow-x: hidden;
-        }
-        
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(138, 43, 226, 0.1) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: 0;
         }
         
         .container {
             max-width: 900px;
             margin: 0 auto;
-            position: relative;
-            z-index: 1;
         }
         
         .back-btn {
             display: inline-block;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
             color: white;
             text-decoration: none;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 20px;
-            transition: all 0.3s;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-size: 14px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .back-btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-        
-        .back-btn:hover::before {
-            width: 300px;
-            height: 300px;
+            transition: background 0.3s;
         }
         
         .back-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            background: rgba(255, 255, 255, 0.3);
         }
         
         .card {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
+            background: white;
+            border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             margin-bottom: 20px;
-            border: 1px solid rgba(138, 43, 226, 0.3);
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-        
-        .card:hover {
-            border-color: rgba(138, 43, 226, 0.6);
-            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.2);
         }
         
         .header {
-            border-bottom: 2px solid rgba(138, 43, 226, 0.3);
+            border-bottom: 2px solid #f0f0f0;
             padding-bottom: 20px;
             margin-bottom: 25px;
         }
@@ -112,44 +60,37 @@
             font-weight: 600;
             text-transform: uppercase;
             margin-bottom: 15px;
-            border: 1px solid;
         }
         
         .status-completed {
-            background: rgba(52, 168, 83, 0.2);
-            color: #4ade80;
-            border-color: #34a853;
+            background: #28a745;
+            color: white;
         }
         
         .status-pending {
-            background: rgba(251, 191, 36, 0.2);
-            color: #fbbf24;
-            border-color: #fbbf24;
+            background: #ffc107;
+            color: #333;
         }
         
         .status-processing {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            border-color: #3b82f6;
+            background: #17a2b8;
+            color: white;
         }
         
         .status-failed {
-            background: rgba(220, 53, 69, 0.2);
-            color: #f87171;
-            border-color: #dc3545;
+            background: #dc3545;
+            color: white;
         }
         
         .thought-text {
             font-size: 20px;
             line-height: 1.6;
-            color: #e0e0e0;
+            color: #333;
             margin: 20px 0;
             padding: 20px;
-            background: rgba(102, 126, 234, 0.1);
+            background: #f8f9fa;
             border-left: 4px solid #667eea;
-            border-radius: 12px;
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            backdrop-filter: blur(5px);
+            border-radius: 8px;
         }
         
         .meta-info {
@@ -158,12 +99,12 @@
             gap: 15px;
             margin: 20px 0;
             font-size: 14px;
-            color: #a0a0a0;
+            color: #666;
         }
         
         .meta-item strong {
             display: block;
-            color: #e0e0e0;
+            color: #333;
             margin-bottom: 5px;
         }
         
@@ -172,16 +113,12 @@
         }
         
         .section-title {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #667eea;
             font-size: 22px;
             margin-bottom: 15px;
             display: flex;
             align-items: center;
             gap: 10px;
-            font-weight: 600;
         }
         
         .priority-badge {
@@ -192,60 +129,43 @@
             font-weight: 700;
             text-transform: uppercase;
             margin: 10px 0;
-            border: 1px solid;
         }
         
         .priority-critical {
-            background: rgba(220, 53, 69, 0.2);
-            color: #f87171;
-            border-color: #dc3545;
+            background: #dc3545;
+            color: white;
         }
         
         .priority-high {
-            background: rgba(249, 115, 22, 0.2);
-            color: #fb923c;
-            border-color: #f97316;
+            background: #fd7e14;
+            color: white;
         }
         
         .priority-medium {
-            background: rgba(251, 191, 36, 0.2);
-            color: #fbbf24;
-            border-color: #fbbf24;
+            background: #ffc107;
+            color: #333;
         }
         
         .priority-low {
-            background: rgba(156, 163, 175, 0.2);
-            color: #9ca3af;
-            border-color: #6b7280;
+            background: #6c757d;
+            color: white;
         }
         
         .info-box {
-            background: rgba(255, 255, 255, 0.03);
+            background: #f8f9fa;
             padding: 15px;
-            border-radius: 12px;
+            border-radius: 8px;
             margin: 10px 0;
-            border: 1px solid rgba(138, 43, 226, 0.2);
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-        }
-        
-        .info-box:hover {
-            border-color: rgba(138, 43, 226, 0.4);
-            background: rgba(255, 255, 255, 0.05);
         }
         
         .info-box h4 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #667eea;
             margin-bottom: 10px;
             font-size: 16px;
-            font-weight: 600;
         }
         
         .info-box p {
-            color: #b0b0b0;
+            color: #555;
             line-height: 1.6;
             margin: 5px 0;
         }
@@ -258,7 +178,7 @@
         .info-box li {
             margin: 8px 0;
             line-height: 1.5;
-            color: #b0b0b0;
+            color: #555;
         }
         
         .grid-2 {
@@ -276,13 +196,13 @@
         .loading {
             text-align: center;
             padding: 60px;
-            color: #a0a0a0;
+            color: white;
             font-size: 18px;
         }
         
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid #667eea;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -296,54 +216,27 @@
         }
         
         .error-message {
-            background: rgba(220, 53, 69, 0.2);
-            color: #f87171;
+            background: #f8d7da;
+            color: #721c24;
             padding: 15px;
-            border-radius: 12px;
+            border-radius: 8px;
             margin: 20px 0;
-            border: 1px solid #dc3545;
         }
         
         .score-badge {
             display: inline-block;
             padding: 4px 12px;
-            background: rgba(102, 126, 234, 0.3);
-            color: #93c5fd;
+            background: #667eea;
+            color: white;
             border-radius: 12px;
             font-weight: 600;
             margin-left: 10px;
-            border: 1px solid rgba(102, 126, 234, 0.5);
-        }
-        
-        ::-webkit-scrollbar {
-            width: 10px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        }
-        
-        h1 {
-            color: #e0e0e0;
-        }
-        
-        strong {
-            color: #e0e0e0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-btn">← Back to Thoughts</a>
+        <a href="index.html" class="back-btn">← Back to Thoughts</a>
         
         <div id="content"></div>
     </div>
@@ -351,15 +244,36 @@
     <script>
         const API_URL = 'http://localhost:8000';
         
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = 'login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Get authentication headers
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+        
         // Get thought ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user_id');
         const thoughtId = urlParams.get('thought_id');
         
-        if (!userId || !thoughtId) {
+        if (!checkAuth()) {
+            // Will redirect to login
+        } else if (!userId || !thoughtId) {
             document.getElementById('content').innerHTML = `
                 <div class="card">
-                    <div class="error-message">Missing user_id or thought id in URL</div>
+                    <div class="error-message">Missing user_id or thought_id in URL</div>
                 </div>
             `;
         } else {
@@ -371,7 +285,18 @@
             contentEl.innerHTML = '<div class="loading"><div class="spinner"></div>Loading thought details...</div>';
             
             try {
-                const response = await fetch(`${API_URL}/thoughts/${userId}/${thoughtId}`);
+                const response = await fetch(`${API_URL}/thoughts/${userId}/${thoughtId}`, {
+                    headers: getAuthHeaders()
+                });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('user_email');
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
                 const thought = await response.json();
                 
                 if (response.ok) {
@@ -400,7 +325,7 @@
                 <div class="card">
                     <div class="header">
                         <span class="status-badge status-${thought.status}">${thought.status}</span>
-                        <h1 style="font-size: 28px; color: #e0e0e0; margin: 15px 0;">Thought Analysis</h1>
+                        <h1 style="font-size: 28px; color: #333; margin: 15px 0;">Thought Analysis</h1>
                     </div>
                     
                     <div class="thought-text">${thought.text}</div>
@@ -439,7 +364,7 @@
                         <div class="section">
                             <h2 class="section-title">🎯 Priority Assessment</h2>
                             <span class="priority-badge priority-${priorityLevel.toLowerCase()}">${priorityLevel}</span>
-                            ${thought.priority.reasoning ? `<p style="margin-top: 15px; color: #b0b0b0; line-height: 1.6;">${thought.priority.reasoning}</p>` : ''}
+                            ${thought.priority.reasoning ? `<p style="margin-top: 15px; color: #555; line-height: 1.6;">${thought.priority.reasoning}</p>` : ''}
                         </div>
                     `;
                 }
