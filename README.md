@@ -64,8 +64,8 @@ graph TB
         REDIS[(Redis)]
     end
     
-    subgraph "AI"
-        AI[Gemini/Claude/GPT]
+    subgraph "AI Providers"
+        AIPROVIDER[Gemini/Claude/GPT]
     end
     
     UI -->|Submit Thought| API
@@ -73,7 +73,7 @@ graph TB
     API -->|Produce Event| KAFKA
     KAFKA -->|Consume| W1 & W2 & W3
     W1 & W2 & W3 -->|Check Cache| CACHE
-    W1 & W2 & W3 -->|Process| AI
+    W1 & W2 & W3 -->|Process| AIPROVIDER
     W1 & W2 & W3 -->|Publish Progress| REDIS
     SSE -->|Stream Events| REDIS
     API & W1 & W2 & W3 <-->|Read/Write| DB
