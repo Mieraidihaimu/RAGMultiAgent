@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Thought Processor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a24 50%, #0f0f18 100%);
+            min-height: 100vh;
+            color: #e5e7eb;
+            padding: 0;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            padding: 0 20px;
+        }
+        
+        /* Compact Header with Stats */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: rgba(17, 17, 27, 0.4);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            margin: 0 -20px;
+        }
+
+        .app-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .mini-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .mini-stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #818cf8;
+        }
+
+        .mini-stat-label {
+            font-size: 0.65rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-email {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            display: none;
+        }
+
+        @media (min-width: 640px) {
+            .user-email {
+                display: block;
+            }
+        }
+
+        .btn-logout {
+            padding: 6px 14px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            color: #ef4444;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        /* Main Input Area - Centered & Elevated */
+        .input-section {
+            margin-top: 80px;
+            margin-bottom: 60px;
+        }
+
+        .input-container {
+            position: relative;
+            background: rgba(17, 17, 27, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 16px;
+            padding: 0;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 25px 70px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.3);
+        }
+
+        .main-textarea {
+            width: 100%;
+            min-height: 180px;
+            padding: 24px;
+            background: transparent;
+            border: none;
+            color: #e5e7eb;
+            font-family: inherit;
+            font-size: 1.05rem;
+            line-height: 1.7;
+            resize: none;
+            outline: none;
+        }
+
+        .main-textarea::placeholder {
+            color: #4b5563;
+            font-weight: 400;
+        }
+
+        .input-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(99, 102, 241, 0.1);
+        }
+
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .action-btn:hover {
+            background: rgba(99, 102, 241, 0.25);
+            transform: scale(1.05);
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .action-btn.submit-btn {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .action-btn.submit-btn:hover {
+            box-shadow: 0 6px 30px rgba(99, 102, 241, 0.5);
+            transform: scale(1.08);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            color: white;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .action-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .char-count {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        /* Status Messages */
+        .status-message {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .status-message.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .status-message.info {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+        }
+
+        /* Anonymous Banner */
+        .anonymous-banner {
+            margin: 20px 0;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            flex-wrap: wrap;
+        }
+
+        .banner-text {
+            color: #fbbf24;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .btn-signup {
+            padding: 8px 18px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-signup:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        /* Filters Section */
+        .filters-section {
+            margin-bottom: 24px;
+        }
+
+        .filters-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .filter-select {
+            padding: 10px 14px;
+            background: rgba(17, 17, 27, 0.4);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            color: #e5e7eb;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .filter-select:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .filter-select:focus {
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .filter-select option {
+            background: #1a1a24;
+            color: #e5e7eb;
+        }
+
+        .btn-reset {
+            padding: 10px 16px;
+            background: transparent;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            color: #818cf8;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-reset:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        /* Thoughts List */
+        .thoughts-section {
+            margin-bottom: 40px;
+        }
+
+        .thoughts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .thought-count {
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .thoughts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .thought-card {
+            background: rgba(17, 17, 27, 0.4);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .thought-card:hover {
+            background: rgba(17, 17, 27, 0.6);
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateX(4px);
+        }
+
+        .thought-card.completed {
+            border-left: 3px solid #10b981;
+        }
+
+        .thought-card.pending {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .thought-card.processing {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .thought-card.failed {
+            border-left: 3px solid #ef4444;
+        }
+
+        .thought-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-badge.processing {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .status-badge.failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .priority-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .priority-badge.critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .priority-badge.high {
+            background: rgba(249, 115, 22, 0.2);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .priority-badge.medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .priority-badge.low {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+            border: 1px solid rgba(107, 114, 128, 0.3);
+        }
+
+        .thought-text {
+            color: #d1d5db;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .thought-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .value-badge {
+            padding: 4px 8px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            color: #818cf8;
+            font-weight: 600;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            opacity: 0.3;
+            margin-bottom: 16px;
+        }
+
+        .empty-text {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .empty-subtext {
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 16px;
+            border: 3px solid rgba(99, 102, 241, 0.2);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            animation: slideInRight 0.3s ease;
+            max-width: 300px;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast.info {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            color: #818cf8;
+        }
+
+        .toast.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
+
+        .toast.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+
+        /* Connection Indicator */
+        .connection-indicator {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            backdrop-filter: blur(20px);
+            z-index: 99;
+            transition: opacity 0.3s;
+        }
+
+        .connection-indicator.connected {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
+
+        .connection-indicator.disconnected {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 640px) {
+            .container {
+                padding: 0 16px;
+            }
+
+            .header-row {
+                padding: 12px 16px;
+                margin: 0 -16px;
+            }
+
+            .app-title {
+                font-size: 1rem;
+            }
+
+            .header-stats {
+                gap: 12px;
+            }
+
+            .mini-stat-value {
+                font-size: 0.9rem;
+            }
+
+            .mini-stat-label {
+                font-size: 0.6rem;
+            }
+
+            .input-section {
+                margin-top: 40px;
+                margin-bottom: 40px;
+            }
+
+            .main-textarea {
+                min-height: 150px;
+                padding: 20px;
+                font-size: 1rem;
+            }
+
+            .input-actions {
+                padding: 12px 16px;
+            }
+
+            .action-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .thought-card {
+                padding: 14px;
+            }
+
+            .anonymous-banner {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+
+            .btn-signup {
+                width: 100%;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(17, 17, 27, 0.4);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.6);
+        }
+
+        /* Rate Limit Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a24, #16213e);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            animation: scaleIn 0.3s ease;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            color: #c4b5fd;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .modal-text {
+            color: #d1d5db;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-modal-primary {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-modal-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn-modal-secondary {
+            padding: 14px 28px;
+            background: transparent;
+            border: 2px solid rgba(99, 102, 241, 0.4);
+            border-radius: 10px;
+            color: #d1d5db;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-modal-secondary:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.6);
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 640px) {
+            .modal-content {
+                padding: 30px 24px;
+            }
+
+            .modal-actions {
+                flex-direction: column;
+            }
+
+            .btn-modal-primary,
+            .btn-modal-secondary {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Compact Header with Mini Stats -->
+    <div class="header-row">
+        <div class="app-title">
+            <span>🧠</span>
+            <span>Thought Processor</span>
+        </div>
+        
+        <div class="header-stats">
+            <div class="mini-stat">
+                <div class="mini-stat-value" id="anxietyLevel">0</div>
+                <div class="mini-stat-label">Anxiety</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-stat-value" id="criticalCount">0</div>
+                <div class="mini-stat-label">Critical</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-stat-value" id="clarityScore">0%</div>
+                <div class="mini-stat-label">Clarity</div>
+            </div>
+        </div>
+
+        <div class="user-menu">
+            <span class="user-email" id="userEmail"></span>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Anonymous Banner (if applicable) -->
+        <div id="anonymousBanner" style="display: none;">
+            <!-- Will be populated by JS -->
+        </div>
+
+        <!-- Main Input Area - Centered and Prominent -->
+        <div class="input-section">
+            <div class="input-container">
+                <textarea 
+                    id="thoughtText" 
+                    class="main-textarea" 
+                    placeholder="What's on your mind? Share your thought, idea, or question..."
+                    maxlength="2000"
+                    oninput="updateCharCount()"
+                ></textarea>
+                
+                <div class="input-actions">
+                    <div class="action-left">
+                        <button 
+                            class="action-btn" 
+                            id="processBtnIcon"
+                            onclick="triggerProcess()" 
+                            title="Process all pending thoughts"
+                        >
+                            ⚡
+                            <span class="badge" id="pendingBadge" style="display: none;">0</span>
+                        </button>
+                        <span class="char-count" id="charCount">0 / 2000</span>
+                    </div>
+                    
+                    <button 
+                        class="action-btn submit-btn" 
+                        id="submitBtn"
+                        onclick="submitThought()" 
+                        title="Submit thought"
+                    >
+                        ➤
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="submitStatus" class="status-message"></div>
+            <div id="processStatus" class="status-message"></div>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filters-section">
+            <div class="filters-header">
+                <h2 class="section-title">All Thoughts</h2>
+                <button class="btn-reset" onclick="resetFilters()">Reset</button>
+            </div>
+            
+            <div class="filter-grid">
+                <select id="filterStatus" class="filter-select" onchange="applyFilters()">
+                    <option value="all">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="failed">Failed</option>
+                </select>
+                
+                <select id="filterPriority" class="filter-select" onchange="applyFilters()">
+                    <option value="all">All Priorities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                
+                <select id="filterCategory" class="filter-select" onchange="applyFilters()">
+                    <option value="all">All Categories</option>
+                    <option value="idea">Idea</option>
+                    <option value="question">Question</option>
+                    <option value="concern">Concern</option>
+                    <option value="observation">Observation</option>
+                    <option value="reflection">Reflection</option>
+                </select>
+                
+                <select id="sortBy" class="filter-select" onchange="applyFilters()">
+                    <option value="created_desc">Newest First</option>
+                    <option value="created_asc">Oldest First</option>
+                    <option value="priority_desc">Priority (High-Low)</option>
+                    <option value="value_desc">Value (High-Low)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Thoughts List -->
+        <div class="thoughts-section">
+            <div class="thoughts-header">
+                <span class="thought-count" id="thoughtCount">0 thoughts</span>
+            </div>
+            
+            <div id="thoughtsList" class="thoughts-list">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading thoughts...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let allThoughts = [];
+        let isAnonymous = false;
+        let anonymousSessionInfo = null;
+        let eventSource = null;
+        let reconnectTimeout = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+
+        // Character count update
+        function updateCharCount() {
+            const textarea = document.getElementById('thoughtText');
+            const charCount = document.getElementById('charCount');
+            charCount.textContent = `${textarea.value.length} / 2000`;
+        }
+
+        // Check if user is authenticated
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            const userId = localStorage.getItem('user_id');
+            
+            if (!token || !userId) {
+                isAnonymous = true;
+                setupAnonymousMode();
+                return true;
+            }
+            isAnonymous = false;
+            return true;
+        }
+
+        // Setup anonymous user mode
+        function setupAnonymousMode() {
+            let sessionToken = localStorage.getItem('anonymous_session_token');
+            if (!sessionToken) {
+                console.log('Anonymous mode: No session token yet');
+            }
+            
+            const userEmailElement = document.getElementById('userEmail');
+            if (userEmailElement) {
+                userEmailElement.textContent = 'Anonymous (3 free)';
+                userEmailElement.style.color = '#f59e0b';
+                userEmailElement.style.display = 'block';
+            }
+            
+            showAnonymousBanner();
+        }
+
+        // Show banner for anonymous users
+        function showAnonymousBanner() {
+            const banner = document.getElementById('anonymousBanner');
+            banner.style.display = 'flex';
+            banner.className = 'anonymous-banner';
+            
+            banner.innerHTML = `
+                <span class="banner-text" id="anonymousBannerText">💭 Try 3 thoughts free! No signup required.</span>
+                <button class="btn-signup" onclick="window.location.href='login.html?signup=true'">Sign Up for More</button>
+            `;
+        }
+
+        // Update anonymous banner
+        function updateAnonymousBanner(sessionInfo) {
+            const bannerText = document.getElementById('anonymousBannerText');
+            if (bannerText && sessionInfo) {
+                const remaining = sessionInfo.thoughts_remaining;
+                if (remaining === 0) {
+                    bannerText.textContent = '🎉 You\'ve used all 3 free thoughts! Sign up to continue.';
+                } else {
+                    bannerText.textContent = `💭 ${remaining} free thought${remaining !== 1 ? 's' : ''} remaining.`;
+                }
+            }
+        }
+
+        // Show rate limit modal
+        function showRateLimitModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-icon">🎯</div>
+                    <h2 class="modal-title">Ready for More Insights?</h2>
+                    <p class="modal-text">
+                        You've reached your limit of 3 free thoughts.<br>
+                        Sign up now to unlock unlimited thought processing and AI-powered insights!
+                    </p>
+                    <div class="modal-actions">
+                        <button class="btn-modal-primary" onclick="signupFromModal()">Sign Up Free</button>
+                        <button class="btn-modal-secondary" onclick="loginFromModal()">I Have an Account</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function signupFromModal() {
+            const sessionToken = localStorage.getItem('anonymous_session_token');
+            localStorage.setItem('pending_conversion_token', sessionToken);
+            window.location.href = 'login.html?signup=true';
+        }
+
+        function loginFromModal() {
+            const sessionToken = localStorage.getItem('anonymous_session_token');
+            localStorage.setItem('pending_conversion_token', sessionToken);
+            window.location.href = 'login.html';
+        }
+
+        // Get authentication headers
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Get or create user ID
+        function getUserId() {
+            let userId = localStorage.getItem('user_id') || localStorage.getItem('thought_user_id');
+            if (!userId && !isAnonymous) {
+                window.location.href = 'login.html';
+                return null;
+            }
+            return userId;
+        }
+
+        // Handle logout
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('thought_user_id');
+            window.location.href = 'login.html';
+        }
+
+        // Show status message
+        function showStatus(elementId, message, type) {
+            const statusDiv = document.getElementById(elementId);
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type} show`;
+            
+            setTimeout(() => {
+                statusDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        // Submit thought
+        async function submitThought() {
+            const thoughtText = document.getElementById('thoughtText').value;
+
+            if (!thoughtText || !thoughtText.trim()) {
+                showStatus('submitStatus', '❌ Please enter a thought', 'error');
+                return;
+            }
+
+            try {
+                if (isAnonymous) {
+                    const sessionToken = localStorage.getItem('anonymous_session_token');
+                    
+                    const response = await fetch(`${API_BASE}/anonymous/thoughts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            text: thoughtText,
+                            session_token: sessionToken 
+                        })
+                    });
+
+                    if (response.status === 429) {
+                        showStatus('submitStatus', '🚀 You\'ve reached your limit! Sign up to continue.', 'error');
+                        showRateLimitModal();
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.session_info && data.session_info.session_token) {
+                            localStorage.setItem('anonymous_session_token', data.session_info.session_token);
+                            anonymousSessionInfo = data.session_info;
+                            updateAnonymousBanner(data.session_info);
+                        }
+                        
+                        const remaining = data.session_info?.thoughts_remaining || 0;
+                        showStatus('submitStatus', `✅ Thought submitted! ${remaining} free thought${remaining !== 1 ? 's' : ''} remaining.`, 'success');
+                        document.getElementById('thoughtText').value = '';
+                        updateCharCount();
+                        setTimeout(() => loadThoughts(), 1000);
+                        
+                        if (remaining === 0) {
+                            setTimeout(() => showRateLimitModal(), 2000);
+                        }
+                    } else {
+                        throw new Error('Failed to submit');
+                    }
+                } else {
+                    const userId = getUserId();
+                    if (!userId) return;
+
+                    const response = await fetch(`${API_BASE}/thoughts`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ user_id: userId, text: thoughtText })
+                    });
+
+                    if (response.status === 401) {
+                        logout();
+                        return;
+                    }
+
+                    if (response.ok) {
+                        showStatus('submitStatus', '✅ Thought submitted successfully!', 'success');
+                        document.getElementById('thoughtText').value = '';
+                        updateCharCount();
+                        setTimeout(() => loadThoughts(), 1000);
+                    } else {
+                        throw new Error('Failed to submit');
+                    }
+                }
+            } catch (error) {
+                showStatus('submitStatus', '❌ Failed to submit thought. Please try again.', 'error');
+            }
+        }
+
+        // Trigger batch processing
+        async function triggerProcess() {
+            showStatus('processStatus', '⚙️ Triggering batch processor...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/process/trigger`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (response.ok) {
+                    showStatus('processStatus', '✅ Processing started! Thoughts will be analyzed.', 'success');
+                    setTimeout(() => loadThoughts(), 2000);
+                } else {
+                    throw new Error('Failed to trigger');
+                }
+            } catch (error) {
+                showStatus('processStatus', '❌ Failed to trigger processing.', 'error');
+            }
+        }
+
+        // Load thoughts
+        async function loadThoughts() {
+            try {
+                let response;
+                
+                if (isAnonymous) {
+                    const sessionToken = localStorage.getItem('anonymous_session_token');
+                    if (!sessionToken) {
+                        allThoughts = [];
+                        updateDashboard();
+                        applyFilters();
+                        return;
+                    }
+                    
+                    response = await fetch(`${API_BASE}/anonymous/thoughts/${sessionToken}`, {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (!response.ok) {
+                        allThoughts = [];
+                        updateDashboard();
+                        applyFilters();
+                        return;
+                    }
+                } else {
+                    const userId = getUserId();
+                    if (!userId) return;
+
+                    response = await fetch(`${API_BASE}/thoughts/${userId}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (response.status === 401) {
+                        logout();
+                        return;
+                    }
+                }
+
+                const data = await response.json();
+                allThoughts = data.thoughts || [];
+                
+                updateDashboard();
+                applyFilters();
+            } catch (error) {
+                console.error('Error loading thoughts:', error);
+                document.getElementById('thoughtsList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <p class="empty-text">Failed to load thoughts</p>
+                        <p class="empty-subtext">Please check your connection</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Update dashboard stats
+        function updateDashboard() {
+            const completed = allThoughts.filter(t => t.status === 'completed');
+            const pending = allThoughts.filter(t => t.status === 'pending');
+
+            // Anxiety Level
+            const anxietyKeywords = ['stress', 'worry', 'anxious', 'nervous', 'overwhelm', 'panic', 'fear'];
+            const anxiousThoughts = completed.filter(t => {
+                const urgency = t.classification?.urgency || '';
+                const tone = t.classification?.emotional_tone || '';
+                const isHighUrgency = urgency === 'high' || urgency === 'immediate';
+                const isAnxiousTone = anxietyKeywords.some(kw => tone.toLowerCase().includes(kw));
+                return isHighUrgency || isAnxiousTone;
+            });
+            const anxietyLevel = anxiousThoughts.length;
+            document.getElementById('anxietyLevel').textContent = anxietyLevel;
+
+            // Critical Count
+            const criticalThoughts = allThoughts.filter(t => {
+                const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                return priorityLevel === 'critical' || priorityLevel === 'high';
+            });
+            document.getElementById('criticalCount').textContent = criticalThoughts.length;
+
+            // Mental Clarity
+            const nonEssentialThoughts = completed.filter(t => {
+                const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                const weightedTotal = t.value_impact?.weighted_total || 0;
+                return priorityLevel === 'defer' || weightedTotal === 0;
+            });
+            const essentialPercentage = completed.length > 0
+                ? Math.round(((completed.length - nonEssentialThoughts.length) / completed.length) * 100)
+                : 0;
+            document.getElementById('clarityScore').textContent = essentialPercentage + '%';
+
+            // Update pending badge
+            const pendingBadge = document.getElementById('pendingBadge');
+            if (pending.length > 0) {
+                pendingBadge.textContent = pending.length;
+                pendingBadge.style.display = 'flex';
+            } else {
+                pendingBadge.style.display = 'none';
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const status = document.getElementById('filterStatus').value;
+            const priority = document.getElementById('filterPriority').value;
+            const category = document.getElementById('filterCategory').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let filtered = [...allThoughts];
+            
+            if (status !== 'all') {
+                filtered = filtered.filter(t => t.status === status);
+            }
+            if (priority !== 'all') {
+                filtered = filtered.filter(t => {
+                    const priorityLevel = t.priority?.priority_level?.toLowerCase() || '';
+                    return priorityLevel === priority.toLowerCase();
+                });
+            }
+            if (category !== 'all') {
+                filtered = filtered.filter(t => t.classification?.type === category);
+            }
+
+            filtered.sort((a, b) => {
+                switch (sortBy) {
+                    case 'created_desc':
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    case 'created_asc':
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    case 'priority_desc':
+                        const priOrder = { critical: 4, high: 3, medium: 2, low: 1, defer: 0 };
+                        const aPri = (a.priority?.priority_level?.toLowerCase() || 'defer');
+                        const bPri = (b.priority?.priority_level?.toLowerCase() || 'defer');
+                        return (priOrder[bPri] || 0) - (priOrder[aPri] || 0);
+                    case 'value_desc':
+                        return (b.analysis?.value_score || 0) - (a.analysis?.value_score || 0);
+                    default:
+                        return 0;
+                }
+            });
+            
+            displayThoughts(filtered);
+        }
+
+        // Reset filters
+        function resetFilters() {
+            document.getElementById('filterStatus').value = 'all';
+            document.getElementById('filterPriority').value = 'all';
+            document.getElementById('filterCategory').value = 'all';
+            document.getElementById('sortBy').value = 'created_desc';
+            applyFilters();
+        }
+
+        // Display thoughts
+        function displayThoughts(thoughts) {
+            const container = document.getElementById('thoughtsList');
+            document.getElementById('thoughtCount').textContent = `${thoughts.length} thought${thoughts.length !== 1 ? 's' : ''}`;
+            
+            if (thoughts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">💭</div>
+                        <p class="empty-text">No thoughts found</p>
+                        <p class="empty-subtext">Try adjusting your filters or submit a new thought</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = thoughts.map(thought => {
+                const analysis = thought.analysis || {};
+                const classification = thought.classification || {};
+                const priorityLevel = (thought.priority?.priority_level || '').toLowerCase();
+                const valueScore = analysis.value_score || 0;
+
+                return `
+                    <div class="thought-card ${thought.status}" onclick="viewDetails('${thought.user_id}', '${thought.id}')">
+                        <div class="thought-card-header">
+                            <span class="status-badge ${thought.status}">${thought.status}</span>
+                            ${priorityLevel ? `<span class="priority-badge ${priorityLevel}">${priorityLevel}</span>` : ''}
+                        </div>
+                        <div class="thought-text">${thought.text}</div>
+                        <div class="thought-meta">
+                            <div class="meta-item">📅 ${new Date(thought.created_at).toLocaleDateString()}</div>
+                            ${classification.type ? `<div class="meta-item">🏷️ ${classification.type}</div>` : ''}
+                            ${valueScore > 0 ? `<span class="value-badge">💎 ${valueScore}/10</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewDetails(userId, thoughtId) {
+            window.location.href = `detail.html?user_id=${userId}&thought_id=${thoughtId}`;
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideInRight 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // SSE Connection (for authenticated users only)
+        function connectSSE() {
+            if (isAnonymous) return;
+
+            const userId = getUserId();
+            if (!userId) return;
+
+            const token = localStorage.getItem('auth_token');
+            if (!token) return;
+
+            try {
+                const url = `${API_BASE}/events/${userId}?token=${encodeURIComponent(token)}`;
+                eventSource = new EventSource(url);
+
+                eventSource.onopen = function() {
+                    console.log('✅ SSE Connected');
+                    reconnectAttempts = 0;
+                };
+
+                eventSource.addEventListener('thought_created', function(e) {
+                    loadThoughts();
+                    showToast('Thought created!', 'info');
+                });
+
+                eventSource.addEventListener('thought_processing', function(e) {
+                    showToast('AI analysis started...', 'info');
+                });
+
+                eventSource.addEventListener('thought_completed', function(e) {
+                    loadThoughts();
+                    showToast('Analysis complete!', 'success');
+                });
+
+                eventSource.addEventListener('thought_failed', function(e) {
+                    loadThoughts();
+                    showToast('Analysis failed', 'error');
+                });
+
+                eventSource.onerror = function(error) {
+                    console.error('SSE error:', error);
+                    eventSource.close();
+                    
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++;
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        reconnectTimeout = setTimeout(() => connectSSE(), delay);
+                    }
+                };
+
+            } catch (error) {
+                console.error('Failed to create SSE connection:', error);
+            }
+        }
+
+        // Check authentication on page load
+        if (!checkAuth()) {
+            // Setup anonymous or authenticated mode
+        } else {
+            if (!isAnonymous) {
+                const userEmail = localStorage.getItem('user_email');
+                if (userEmail) {
+                    document.getElementById('userEmail').textContent = userEmail;
+                    document.getElementById('userEmail').style.display = 'block';
+                }
+            }
+        }
+
+        // Initialize
+        loadThoughts();
+        
+        if (!isAnonymous) {
+            connectSSE();
+        } else {
+            setInterval(loadThoughts, 15000);
+        }
+
+        // Cleanup
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) eventSource.close();
+        });
+    </script>
+</body>
+</html>

@@ -390,6 +390,10 @@ class PostgreSQLAdapter(DatabaseAdapter):
             # Encrypt sensitive fields before storing
             if key in self.ENCRYPTED_FIELDS:
                 value = self._encrypt_field(key, value)
+                # Encrypted fields return strings, but if encryption is disabled,
+                # we need to ensure dict values are converted to JSON
+                if key in json_fields and isinstance(value, dict):
+                    value = json.dumps(value)
             # Convert dict values to JSON strings for JSONB columns
             # asyncpg will automatically convert JSON strings to JSONB
             elif key in json_fields and isinstance(value, dict):
@@ -564,6 +568,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
         embedding_str = str(embedding)
         # Encrypt response before storing
         encrypted_response = self._encrypt_field('response', response)
+        # Ensure response is JSON string if encryption returned a dict (when disabled)
+        if isinstance(encrypted_response, dict):
+            encrypted_response = json.dumps(encrypted_response)
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
