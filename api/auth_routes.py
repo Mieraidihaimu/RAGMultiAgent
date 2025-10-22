@@ -23,8 +23,43 @@ from auth import (
 )
 from database import get_db
 from common.database.base import DatabaseAdapter
+from anonymous_utils import convert_anonymous_to_user
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+@router.post("/convert-anonymous", status_code=status.HTTP_200_OK)
+async def convert_anonymous_session(
+    session_token: str,
+    current_user: TokenData = Depends(get_current_user),
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Convert anonymous thoughts to a registered user account
+    
+    This should be called after signup/login to transfer any thoughts
+    created during anonymous browsing to the user's account.
+    
+    - **session_token**: The anonymous session token from local storage
+    """
+    try:
+        thoughts_converted = await convert_anonymous_to_user(
+            db, session_token, current_user.user_id
+        )
+        
+        logger.info(f"Converted {thoughts_converted} anonymous thoughts to user {current_user.email}")
+        
+        return {
+            "message": f"Successfully transferred {thoughts_converted} thoughts to your account",
+            "thoughts_converted": thoughts_converted
+        }
+        
+    except Exception as e:
+        logger.error(f"Error converting anonymous session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to convert anonymous session"
+        )
+
 
 @router.post("/signup", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserSignup, request: Request, db: DatabaseAdapter = Depends(get_db)):

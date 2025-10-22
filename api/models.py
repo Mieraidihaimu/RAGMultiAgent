@@ -21,12 +21,45 @@ class ThoughtInput(BaseModel):
         }
 
 
+class AnonymousThoughtInput(BaseModel):
+    """Input model for creating a new thought as anonymous user"""
+    text: str = Field(..., min_length=1, max_length=10000, description="The thought text")
+    session_token: Optional[str] = Field(None, description="Anonymous session token")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "text": "Should I start learning Rust to stay relevant in my career?",
+                "session_token": "anon_abc123xyz"
+            }
+        }
+
+
+class AnonymousSessionResponse(BaseModel):
+    """Response model for anonymous session info"""
+    session_token: str
+    thoughts_remaining: int
+    thoughts_used: int
+    limit_reached: bool
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_token": "anon_abc123xyz",
+                "thoughts_remaining": 2,
+                "thoughts_used": 1,
+                "limit_reached": False
+            }
+        }
+
+
 class ThoughtResponse(BaseModel):
     """Response model for thought creation"""
     id: UUID
     status: str
     message: str
     created_at: datetime
+    session_info: Optional['AnonymousSessionResponse'] = None
 
     class Config:
         json_schema_extra = {

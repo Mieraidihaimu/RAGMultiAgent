@@ -27,10 +27,22 @@ from models import (
     UserContextUpdate,
     WeeklySynthesisResponse,
     HealthResponse,
-    ErrorResponse
+    ErrorResponse,
+    AnonymousThoughtInput,
+    AnonymousSessionResponse
 )
 from database import get_db
 from common.database.base import DatabaseAdapter
+from anonymous_utils import (
+    generate_session_token,
+    get_client_ip,
+    get_user_agent,
+    create_anonymous_session,
+    get_anonymous_session,
+    check_rate_limit,
+    increment_thought_count,
+    convert_anonymous_to_user
+)
 
 # Import Kafka and SSE components
 KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "false").lower() == "true"
@@ -172,6 +184,246 @@ async def health_check(db: DatabaseAdapter = Depends(get_db)):
         version="1.0.0",
         database=db_status
     )
+
+
+@app.post(
+    "/anonymous/thoughts",
+    response_model=ThoughtResponse,
+    status_code=201,
+    tags=["Anonymous"]
+)
+async def create_anonymous_thought(
+    thought: AnonymousThoughtInput,
+    request: Request,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Create a thought as an anonymous user (no authentication required)
+    
+    Anonymous users can submit up to 3 thoughts before needing to sign up.
+    If no session_token is provided, a new session will be created.
+    
+    Returns the thought along with session info showing remaining thoughts.
+    """
+    try:
+        # Get or create anonymous session
+        session_token = thought.session_token
+        ip_address = get_client_ip(request)
+        user_agent = get_user_agent(request)
+        
+        if not session_token:
+            # Create new anonymous session
+            session_token = generate_session_token()
+            session = await create_anonymous_session(
+                db, session_token, ip_address, user_agent
+            )
+            if not session:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to create anonymous session"
+                )
+        else:
+            # Verify existing session
+            session = await get_anonymous_session(db, session_token)
+            if not session:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid or expired session token"
+                )
+            
+            # Check if session was already converted to a user
+            if session.get("converted_to_user_id"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="This session has been converted to a registered account. Please log in."
+                )
+        
+        # Check rate limit
+        rate_limit = await check_rate_limit(db, session_token)
+        if rate_limit["limit_reached"]:
+            raise HTTPException(
+                status_code=429,
+                detail="You've reached the limit of 3 free thoughts. Please sign up to continue!",
+                headers={"X-Rate-Limit-Reached": "true"}
+            )
+        
+        # Create the thought
+        query = """
+        INSERT INTO thoughts (anonymous_session_id, text, status)
+        VALUES (
+            (SELECT id FROM anonymous_sessions WHERE session_token = $1),
+            $2,
+            'pending'
+        )
+        RETURNING id, text, status, created_at
+        """
+        
+        async with db.pool.acquire() as conn:
+            thought_data = await conn.fetchrow(query, session_token, thought.text)
+        
+        if not thought_data:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create thought"
+            )
+        
+        logger.info(f"Created anonymous thought {thought_data['id']} for session {session_token[:20]}...")
+        
+        # Increment thought count
+        count_info = await increment_thought_count(db, session_token)
+        
+        # Prepare session info for response
+        session_info = AnonymousSessionResponse(
+            session_token=session_token,
+            thoughts_remaining=count_info["thoughts_remaining"],
+            thoughts_used=count_info["thought_count"],
+            limit_reached=count_info["limit_reached"]
+        )
+        
+        # If Kafka is enabled, publish event for real-time processing
+        if KAFKA_ENABLED and KAFKA_AVAILABLE:
+            try:
+                kafka_producer = await get_kafka_producer()
+                sse_manager = await get_sse_manager()
+
+                # Publish to Kafka topic with anonymous flag
+                success = await kafka_producer.send_thought_created(
+                    user_id=None,  # No user ID for anonymous
+                    thought_id=str(thought_data["id"]),
+                    text=thought.text,
+                    user_context={},  # No context for anonymous users
+                    anonymous_session=session_token
+                )
+
+                if success:
+                    message = "Thought saved! Processing started..."
+                    logger.info(f"Published anonymous thought {thought_data['id']} to Kafka")
+                else:
+                    message = "Thought saved! Will be processed soon."
+                    logger.warning(f"Failed to publish anonymous thought {thought_data['id']} to Kafka")
+
+            except Exception as kafka_error:
+                logger.error(f"Kafka publishing error: {kafka_error}")
+                message = "Thought saved! Will be processed in next batch."
+        else:
+            # Batch mode message
+            message = "Thought saved! It will be analyzed tonight."
+        
+        return ThoughtResponse(
+            id=thought_data["id"],
+            status="pending",
+            message=message,
+            created_at=thought_data["created_at"],
+            session_info=session_info
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating anonymous thought: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/anonymous/session/{session_token}",
+    response_model=AnonymousSessionResponse,
+    tags=["Anonymous"]
+)
+async def get_anonymous_session_info(
+    session_token: str,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Get information about an anonymous session including remaining thoughts
+    """
+    try:
+        session = await get_anonymous_session(db, session_token)
+        
+        if not session:
+            raise HTTPException(
+                status_code=404,
+                detail="Session not found or expired"
+            )
+        
+        rate_limit = await check_rate_limit(db, session_token)
+        
+        return AnonymousSessionResponse(
+            session_token=session_token,
+            thoughts_remaining=rate_limit["thoughts_remaining"],
+            thoughts_used=rate_limit["thoughts_used"],
+            limit_reached=rate_limit["limit_reached"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting anonymous session info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/anonymous/thoughts/{session_token}",
+    response_model=ThoughtsListResponse,
+    tags=["Anonymous"]
+)
+async def get_anonymous_thoughts(
+    session_token: str,
+    status: Optional[str] = Query(None, description="Filter by status"),
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Get all thoughts for an anonymous session
+    """
+    try:
+        # Verify session exists
+        session = await get_anonymous_session(db, session_token)
+        if not session:
+            raise HTTPException(
+                status_code=404,
+                detail="Session not found or expired"
+            )
+        
+        # Build query with optional status filter
+        async with db.pool.acquire() as conn:
+            if status:
+                query = """
+                SELECT t.id, t.anonymous_session_id::text as user_id, t.text, t.status, 
+                       t.created_at, t.processed_at, t.classification, t.analysis,
+                       t.value_impact, t.action_plan, t.priority
+                FROM thoughts t
+                WHERE t.anonymous_session_id = (
+                    SELECT id FROM anonymous_sessions WHERE session_token = $1
+                )
+                AND t.status = $2
+                ORDER BY t.created_at DESC
+                """
+                result = await conn.fetch(query, session_token, status)
+            else:
+                query = """
+                SELECT t.id, t.anonymous_session_id::text as user_id, t.text, t.status,
+                       t.created_at, t.processed_at, t.classification, t.analysis,
+                       t.value_impact, t.action_plan, t.priority
+                FROM thoughts t
+                WHERE t.anonymous_session_id = (
+                    SELECT id FROM anonymous_sessions WHERE session_token = $1
+                )
+                ORDER BY t.created_at DESC
+                """
+                result = await conn.fetch(query, session_token)
+        
+        thoughts = [ThoughtDetail(**dict(item)) for item in result] if result else []
+        
+        return ThoughtsListResponse(
+            thoughts=thoughts,
+            count=len(thoughts),
+            status_filter=status
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving anonymous thoughts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post(
@@ -550,6 +802,129 @@ async def trigger_processing():
     except Exception as e:
         logger.error(f"Error triggering processing: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/events/{user_id}",
+    tags=["SSE"]
+)
+async def stream_events(
+    user_id: UUID,
+    request: Request,
+    token: Optional[str] = Query(None, description="Auth token for SSE (since EventSource can't send headers)")
+):
+    """
+    Server-Sent Events endpoint for real-time thought updates
+    
+    Streams events like:
+    - thought_created: New thought submitted
+    - thought_processing: Thought analysis started
+    - thought_agent_completed: Individual agent finished
+    - thought_completed: Full analysis complete
+    - thought_failed: Processing error
+    
+    Requires authentication - users can only subscribe to their own events.
+    Note: Token passed as query param since EventSource doesn't support custom headers.
+    """
+    if not KAFKA_ENABLED or not KAFKA_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Real-time updates not available. Kafka/SSE not enabled."
+        )
+    
+    # Verify authentication via query param token
+    if AUTH_AVAILABLE and token:
+        try:
+            from auth import decode_access_token
+            current_user = decode_access_token(token)
+            
+            # Verify user can only access their own events
+            if str(user_id) != current_user.user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot access other users' event streams"
+                )
+        except Exception as e:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired token"
+            )
+    elif AUTH_AVAILABLE:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Pass token as query parameter."
+        )
+    
+    try:
+        sse_manager = await get_sse_manager()
+        
+        async def event_generator():
+            """Generate SSE events from Redis pub/sub"""
+            pubsub = None
+            try:
+                # Subscribe to user's Redis channel
+                pubsub = await sse_manager.subscribe(str(user_id))
+                
+                # Send initial connection event
+                yield {
+                    "event": "connected",
+                    "data": json.dumps({
+                        "message": "SSE connection established",
+                        "user_id": str(user_id),
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                }
+                
+                logger.info(f"SSE stream started for user {user_id}")
+                
+                # Listen for messages
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        try:
+                            payload = json.loads(message["data"])
+                            event_type = payload.get("event", "message")
+                            event_data = payload.get("data", {})
+                            event_id = payload.get("event_id")
+                            
+                            # Format as SSE
+                            sse_event = {
+                                "event": event_type,
+                                "data": json.dumps(event_data)
+                            }
+                            
+                            if event_id:
+                                sse_event["id"] = event_id
+                            
+                            yield sse_event
+                            
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Invalid JSON in Redis message: {e}")
+                            continue
+                    
+                    # Check if client disconnected
+                    if await request.is_disconnected():
+                        logger.info(f"Client disconnected: user {user_id}")
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error in SSE stream: {e}")
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"error": str(e)})
+                }
+            finally:
+                if pubsub:
+                    await sse_manager.unsubscribe(str(user_id), pubsub)
+                logger.info(f"SSE stream closed for user {user_id}")
+        
+        return EventSourceResponse(event_generator())
+        
+    except Exception as e:
+        logger.error(f"Failed to create SSE stream: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to establish SSE connection: {str(e)}"
+        )
 
 
 @app.exception_handler(Exception)

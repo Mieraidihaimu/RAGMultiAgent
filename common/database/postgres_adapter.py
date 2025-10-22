@@ -390,7 +390,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
             # Encrypt sensitive fields before storing
             if key in self.ENCRYPTED_FIELDS:
                 value = self._encrypt_field(key, value)
-            # Serialize dict values to JSON strings for JSONB columns (non-encrypted)
+            # Convert dict values to JSON strings for JSONB columns
+            # asyncpg will automatically convert JSON strings to JSONB
             elif key in json_fields and isinstance(value, dict):
                 value = json.dumps(value)
             # Handle vector embeddings - convert list to string format for pgvector

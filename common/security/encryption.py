@@ -32,7 +32,7 @@ from typing import Any, Dict, Optional, Union
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from loguru import logger
 
 
@@ -333,7 +333,7 @@ class EncryptionService:
         Note: Use this for per-user encryption keys if needed
         Performance: ~50-100ms (intentionally slow for security)
         """
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,

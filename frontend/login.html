@@ -443,6 +443,38 @@
     <script>
         const API_BASE = 'http://localhost:8000';
 
+        // Convert anonymous thoughts to user account
+        async function convertAnonymousThoughts(authToken) {
+            const sessionToken = localStorage.getItem('pending_conversion_token') || 
+                                localStorage.getItem('anonymous_session_token');
+            
+            if (!sessionToken) {
+                return; // No anonymous session to convert
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/convert-anonymous?session_token=${sessionToken}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`Converted ${data.thoughts_converted} anonymous thoughts`);
+                    
+                    // Clean up anonymous session data
+                    localStorage.removeItem('anonymous_session_token');
+                    localStorage.removeItem('pending_conversion_token');
+                }
+            } catch (error) {
+                console.error('Error converting anonymous thoughts:', error);
+                // Continue anyway - don't block login
+            }
+        }
+
         function switchTab(tab) {
             // Update tab buttons
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -490,6 +522,9 @@
                         localStorage.setItem('user_id', userData.id);
                         localStorage.setItem('thought_user_id', userData.id);
                     }
+
+                    // Convert anonymous thoughts if any
+                    await convertAnonymousThoughts(result.access_token);
 
                     showAlert('success', 'Login successful! Redirecting...');
 
@@ -581,6 +616,9 @@
                     if (consentMarketing) {
                         localStorage.setItem('marketing_enabled', 'true');
                     }
+
+                    // Convert anonymous thoughts if any
+                    await convertAnonymousThoughts(result.access_token);
 
                     setTimeout(() => {
                         window.location.href = 'index.html';

@@ -9,6 +9,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
+from uuid import UUID
 
 from loguru import logger
 
@@ -64,11 +65,21 @@ class ThoughtProcessor:
             return
 
         try:
+            # Convert UUIDs to strings for JSON serialization
+            def convert_uuids(obj):
+                if isinstance(obj, UUID):
+                    return str(obj)
+                elif isinstance(obj, dict):
+                    return {k: convert_uuids(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_uuids(item) for item in obj]
+                return obj
+            
             channel = f"thought_updates:{user_id}"
             payload = {
                 "event": event_type,
                 "timestamp": datetime.utcnow().isoformat(),
-                "data": data
+                "data": convert_uuids(data)
             }
             await self.redis_client.publish(channel, json.dumps(payload))
             logger.debug(f"Published SSE update: {event_type} to {channel}")
@@ -506,6 +517,91 @@ Return JSON with:
 BatchThoughtProcessor = ThoughtProcessor
 
 
+async def republish_pending_thoughts(db: DatabaseAdapter):
+    """
+    Scan database for pending thoughts and republish them to Kafka
+    This handles thoughts that were created while workers were down
+    """
+    try:
+        from kafka.producer import KafkaThoughtProducer
+        
+        logger.info("Scanning for pending thoughts to republish...")
+        
+        # Get all pending thoughts from database with user context
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT 
+                    t.id, 
+                    t.user_id, 
+                    t.text, 
+                    t.created_at,
+                    u.context as user_context
+                FROM thoughts t
+                LEFT JOIN users u ON t.user_id = u.id
+                WHERE t.status = 'pending'
+                ORDER BY t.created_at ASC
+            """)
+        
+        if not rows:
+            logger.info("No pending thoughts found.")
+            return
+        
+        logger.info(f"Found {len(rows)} pending thought(s) to republish")
+        
+        # Initialize Kafka producer
+        producer = KafkaThoughtProducer(settings.kafka_bootstrap_servers)
+        await producer.start()
+        
+        republished_count = 0
+        failed_count = 0
+        
+        for row in rows:
+            try:
+                thought_id = str(row['id'])
+                user_id = str(row['user_id']) if row['user_id'] else None
+                text = row['text']
+                user_context = row['user_context'] if row['user_context'] else {}
+                
+                # Parse context if it's a JSON string
+                if isinstance(user_context, str):
+                    try:
+                        import json
+                        user_context = json.loads(user_context)
+                    except:
+                        user_context = {}
+                
+                # Skip if no user_id (should not happen with schema)
+                if not user_id:
+                    logger.warning(f"Skipping thought {thought_id} - no user_id")
+                    continue
+                
+                # Republish to Kafka
+                success = await producer.send_thought_created(
+                    user_id=user_id,
+                    thought_id=thought_id,
+                    text=text,
+                    user_context=user_context
+                )
+                
+                if success:
+                    republished_count += 1
+                    logger.info(f"✓ Republished thought {thought_id}")
+                else:
+                    failed_count += 1
+                    logger.error(f"✗ Failed to republish thought {thought_id}")
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Error republishing thought {row['id']}: {e}")
+        
+        await producer.stop()
+        
+        logger.info(f"Republish complete: {republished_count} succeeded, {failed_count} failed")
+        
+    except Exception as e:
+        logger.error(f"Error in republish_pending_thoughts: {e}", exc_info=True)
+
+
 async def kafka_consumer_mode(db: DatabaseAdapter, redis_client: aioredis.Redis):
     """
     Run as Kafka consumer - processes thoughts from Kafka topic
@@ -520,6 +616,10 @@ async def kafka_consumer_mode(db: DatabaseAdapter, redis_client: aioredis.Redis)
     # Initialize processor with Redis for SSE
     processor = ThoughtProcessor(db, redis_client)
 
+    # Startup scan: Republish any pending thoughts to Kafka
+    # This handles thoughts that were created while workers were down
+    await republish_pending_thoughts(db)
+
     # Define message handler
     async def handle_thought_event(event: ThoughtEvent) -> bool:
         """Handle incoming thought events from Kafka"""
@@ -533,6 +633,13 @@ async def kafka_consumer_mode(db: DatabaseAdapter, redis_client: aioredis.Redis)
                 if not thought:
                     logger.error(f"Thought not found in DB: {event.thought_id}")
                     return False
+
+                # Fetch user context from users table
+                user = await db.get_user(event.user_id)
+                if user and user.get('context'):
+                    thought['context'] = user['context']
+                else:
+                    thought['context'] = {}
 
                 # Process thought with SSE updates
                 success = await processor.process_single_thought(thought, publish_updates=True)

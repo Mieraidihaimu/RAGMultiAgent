@@ -703,18 +703,192 @@
         const API_BASE = 'http://localhost:8000';
         let allThoughts = [];
         let currentViewMode = 'list';
+        let isAnonymous = false;
+        let anonymousSessionInfo = null;
+        let eventSource = null;
+        let reconnectTimeout = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
 
-        // Check if user is authenticated on page load
+        // Check if user is authenticated (or allow anonymous mode)
         function checkAuth() {
             const token = localStorage.getItem('auth_token');
             const userId = localStorage.getItem('user_id');
             
             if (!token || !userId) {
-                // Redirect to login if not authenticated
-                window.location.href = 'login.html';
-                return false;
+                // Allow anonymous mode
+                isAnonymous = true;
+                setupAnonymousMode();
+                return true; // Allow to continue
             }
+            isAnonymous = false;
             return true;
+        }
+
+        // Setup anonymous user mode
+        function setupAnonymousMode() {
+            // Get or create anonymous session token
+            let sessionToken = localStorage.getItem('anonymous_session_token');
+            if (!sessionToken) {
+                // Will be created on first thought submission
+                console.log('Anonymous mode: No session token yet');
+            }
+            
+            // Update UI for anonymous user
+            const userEmailElement = document.getElementById('userEmail');
+            if (userEmailElement) {
+                userEmailElement.textContent = 'Anonymous User (3 free thoughts)';
+                userEmailElement.style.color = '#fbbf24';
+            }
+            
+            // Show anonymous banner
+            showAnonymousBanner();
+        }
+
+        // Show banner for anonymous users
+        function showAnonymousBanner() {
+            const banner = document.createElement('div');
+            banner.id = 'anonymousBanner';
+            banner.style.cssText = `
+                background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
+                border: 1px solid rgba(251, 191, 36, 0.5);
+                border-radius: 10px;
+                padding: 15px 20px;
+                margin-bottom: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                backdrop-filter: blur(10px);
+            `;
+            
+            const textSpan = document.createElement('span');
+            textSpan.id = 'anonymousBannerText';
+            textSpan.textContent = '💭 Try 3 thoughts for free! No signup required.';
+            textSpan.style.color = '#e0e0e0';
+            
+            const signupBtn = document.createElement('button');
+            signupBtn.textContent = 'Sign Up for More';
+            signupBtn.style.cssText = `
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border: none;
+                color: white;
+                padding: 8px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            `;
+            signupBtn.onmouseover = function() { this.style.transform = 'translateY(-2px)'; };
+            signupBtn.onmouseout = function() { this.style.transform = 'translateY(0)'; };
+            signupBtn.onclick = function() { window.location.href = 'login.html?signup=true'; };
+            
+            banner.appendChild(textSpan);
+            banner.appendChild(signupBtn);
+            
+            const container = document.querySelector('.container');
+            const header = document.querySelector('.header');
+            container.insertBefore(banner, header.nextSibling);
+        }
+
+        // Update anonymous banner with remaining thoughts
+        function updateAnonymousBanner(sessionInfo) {
+            const bannerText = document.getElementById('anonymousBannerText');
+            if (bannerText && sessionInfo) {
+                const remaining = sessionInfo.thoughts_remaining;
+                if (remaining === 0) {
+                    bannerText.textContent = '🎉 You\'ve used all 3 free thoughts! Sign up to continue.';
+                    bannerText.style.color = '#fbbf24';
+                } else {
+                    bannerText.textContent = `💭 ${remaining} free thought${remaining !== 1 ? 's' : ''} remaining. Sign up for unlimited!`;
+                }
+            }
+        }
+
+        // Show rate limit modal when limit is reached
+        function showRateLimitModal() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+                backdrop-filter: blur(10px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 2px solid rgba(138, 43, 226, 0.5);
+                border-radius: 20px;
+                padding: 40px;
+                max-width: 500px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(138, 43, 226, 0.4);
+            `;
+            
+            modalContent.innerHTML = `
+                <div style="font-size: 4rem; margin-bottom: 20px;">🎯</div>
+                <h2 style="color: #f093fb; margin-bottom: 15px; font-size: 2rem;">Ready for More Insights?</h2>
+                <p style="color: #e0e0e0; margin-bottom: 25px; font-size: 1.1rem; line-height: 1.6;">
+                    You've reached your limit of 3 free thoughts.<br>
+                    Sign up now to unlock unlimited thought processing and AI-powered insights!
+                </p>
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button id="signupBtn" style="
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                        border: none;
+                        color: white;
+                        padding: 15px 30px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 1rem;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                    ">Sign Up Free</button>
+                    <button id="loginBtn" style="
+                        background: transparent;
+                        border: 2px solid rgba(138, 43, 226, 0.5);
+                        color: #e0e0e0;
+                        padding: 15px 30px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 1rem;
+                        transition: all 0.3s ease;
+                    ">I Have an Account</button>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            document.getElementById('signupBtn').onclick = function() {
+                const sessionToken = localStorage.getItem('anonymous_session_token');
+                localStorage.setItem('pending_conversion_token', sessionToken);
+                window.location.href = 'login.html?signup=true';
+            };
+            
+            document.getElementById('loginBtn').onclick = function() {
+                const sessionToken = localStorage.getItem('anonymous_session_token');
+                localStorage.setItem('pending_conversion_token', sessionToken);
+                window.location.href = 'login.html';
+            };
+            
+            // Hover effects
+            const signupBtn = document.getElementById('signupBtn');
+            signupBtn.onmouseover = function() { this.style.transform = 'translateY(-3px)'; };
+            signupBtn.onmouseout = function() { this.style.transform = 'translateY(0)'; };
+            
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.onmouseover = function() { this.style.transform = 'translateY(-3px)'; this.style.borderColor = '#764ba2'; };
+            loginBtn.onmouseout = function() { this.style.transform = 'translateY(0)'; this.style.borderColor = 'rgba(138, 43, 226, 0.5)'; };
         }
 
         // Get authentication headers
@@ -729,8 +903,8 @@
         // Get or create user ID from localStorage
         function getUserId() {
             let userId = localStorage.getItem('user_id') || localStorage.getItem('thought_user_id');
-            if (!userId) {
-                // If no user ID, redirect to login
+            if (!userId && !isAnonymous) {
+                // If no user ID and not anonymous, redirect to login
                 window.location.href = 'login.html';
                 return null;
             }
@@ -748,19 +922,18 @@
 
         // Check authentication on page load
         if (!checkAuth()) {
-            // Will redirect to login
+            // Will setup anonymous mode or stay as authenticated
         } else {
-            // Display user email
-            const userEmail = localStorage.getItem('user_email');
-            if (userEmail) {
-                document.getElementById('userEmail').textContent = userEmail;
+            // Display user email if authenticated
+            if (!isAnonymous) {
+                const userEmail = localStorage.getItem('user_email');
+                if (userEmail) {
+                    document.getElementById('userEmail').textContent = userEmail;
+                }
             }
         }
 
         async function submitThought() {
-            const userId = getUserId();
-            if (!userId) return;
-
             const thoughtText = document.getElementById('thoughtText').value;
             const statusDiv = document.getElementById('submitStatus');
 
@@ -771,25 +944,75 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/thoughts`, {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({ user_id: userId, text: thoughtText })
-                });
+                if (isAnonymous) {
+                    // Anonymous submission
+                    const sessionToken = localStorage.getItem('anonymous_session_token');
+                    
+                    const response = await fetch(`${API_BASE}/anonymous/thoughts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            text: thoughtText,
+                            session_token: sessionToken 
+                        })
+                    });
 
-                if (response.status === 401) {
-                    // Token expired or invalid
-                    logout();
-                    return;
-                }
+                    if (response.status === 429) {
+                        // Rate limit reached
+                        statusDiv.className = 'status error';
+                        statusDiv.textContent = '🚀 You\'ve reached your limit! Sign up to continue.';
+                        showRateLimitModal();
+                        return;
+                    }
 
-                if (response.ok) {
-                    statusDiv.className = 'status success';
-                    statusDiv.textContent = '✅ Thought submitted successfully!';
-                    document.getElementById('thoughtText').value = '';
-                    setTimeout(() => loadThoughts(), 1000);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Store session token if new
+                        if (data.session_info && data.session_info.session_token) {
+                            localStorage.setItem('anonymous_session_token', data.session_info.session_token);
+                            anonymousSessionInfo = data.session_info;
+                            updateAnonymousBanner(data.session_info);
+                        }
+                        
+                        statusDiv.className = 'status success';
+                        const remaining = data.session_info?.thoughts_remaining || 0;
+                        statusDiv.textContent = `✅ Thought submitted! ${remaining} free thought${remaining !== 1 ? 's' : ''} remaining.`;
+                        document.getElementById('thoughtText').value = '';
+                        setTimeout(() => loadThoughts(), 1000);
+                        
+                        // Show modal if this was the last thought
+                        if (remaining === 0) {
+                            setTimeout(() => showRateLimitModal(), 2000);
+                        }
+                    } else {
+                        throw new Error('Failed to submit');
+                    }
                 } else {
-                    throw new Error('Failed to submit');
+                    // Authenticated submission
+                    const userId = getUserId();
+                    if (!userId) return;
+
+                    const response = await fetch(`${API_BASE}/thoughts`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ user_id: userId, text: thoughtText })
+                    });
+
+                    if (response.status === 401) {
+                        // Token expired or invalid
+                        logout();
+                        return;
+                    }
+
+                    if (response.ok) {
+                        statusDiv.className = 'status success';
+                        statusDiv.textContent = '✅ Thought submitted successfully!';
+                        document.getElementById('thoughtText').value = '';
+                        setTimeout(() => loadThoughts(), 1000);
+                    } else {
+                        throw new Error('Failed to submit');
+                    }
                 }
             } catch (error) {
                 statusDiv.className = 'status error';
@@ -828,16 +1051,42 @@
 
         async function loadThoughts() {
             try {
-                const userId = getUserId();
-                if (!userId) return;
+                let response;
+                
+                if (isAnonymous) {
+                    // Load anonymous thoughts
+                    const sessionToken = localStorage.getItem('anonymous_session_token');
+                    if (!sessionToken) {
+                        // No session yet, show empty state
+                        allThoughts = [];
+                        updateDashboard();
+                        applyFilters();
+                        return;
+                    }
+                    
+                    response = await fetch(`${API_BASE}/anonymous/thoughts/${sessionToken}`, {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (!response.ok) {
+                        allThoughts = [];
+                        updateDashboard();
+                        applyFilters();
+                        return;
+                    }
+                } else {
+                    // Load authenticated user thoughts
+                    const userId = getUserId();
+                    if (!userId) return;
 
-                const response = await fetch(`${API_BASE}/thoughts/${userId}`, {
-                    headers: getAuthHeaders()
-                });
+                    response = await fetch(`${API_BASE}/thoughts/${userId}`, {
+                        headers: getAuthHeaders()
+                    });
 
-                if (response.status === 401) {
-                    logout();
-                    return;
+                    if (response.status === 401) {
+                        logout();
+                        return;
+                    }
                 }
 
                 const data = await response.json();
@@ -1043,8 +1292,247 @@
             window.location.href = `detail.html?user_id=${userId}&thought_id=${thoughtId}`;
         }
 
-        setInterval(loadThoughts, 10000);
+        // SSE Connection Management
+        function connectSSE() {
+            if (isAnonymous) {
+                // Anonymous users don't get SSE (no real-time processing anyway)
+                return;
+            }
+
+            const userId = getUserId();
+            if (!userId) return;
+
+            const token = localStorage.getItem('auth_token');
+            if (!token) return;
+
+            // Close existing connection
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            try {
+                // Create SSE connection with auth token as query param
+                // Note: EventSource doesn't support custom headers, so we use query param
+                const url = `${API_BASE}/events/${userId}?token=${encodeURIComponent(token)}`;
+                eventSource = new EventSource(url);
+
+                eventSource.onopen = function() {
+                    console.log('✅ SSE Connected - Real-time updates enabled');
+                    reconnectAttempts = 0;
+                    
+                    // Show connection indicator
+                    showConnectionStatus('connected');
+                };
+
+                eventSource.addEventListener('connected', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.log('SSE Connection confirmed:', data.message);
+                });
+
+                eventSource.addEventListener('thought_created', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.log('🆕 New thought created:', data.thought_id);
+                    
+                    // Reload thoughts to show new one
+                    loadThoughts();
+                    
+                    // Show toast notification
+                    showToast('Thought created! Analysis will begin shortly.', 'info');
+                });
+
+                eventSource.addEventListener('thought_processing', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.log('⚙️ Thought processing:', data.thought_id);
+                    
+                    // Update thought status in UI
+                    updateThoughtStatus(data.thought_id, 'processing', data.message);
+                    
+                    showToast('AI analysis started...', 'info');
+                });
+
+                eventSource.addEventListener('thought_agent_completed', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.log(`✓ Agent ${data.agent} completed (${data.progress})`);
+                    
+                    // Show progress
+                    showToast(`${data.agent} completed (${data.progress})`, 'success');
+                });
+
+                eventSource.addEventListener('thought_completed', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.log('✅ Thought completed:', data.thought_id);
+                    
+                    // Reload thoughts to show analysis
+                    loadThoughts();
+                    
+                    showToast('Analysis complete! View your insights.', 'success');
+                });
+
+                eventSource.addEventListener('thought_failed', function(e) {
+                    const data = JSON.parse(e.data);
+                    console.error('❌ Thought failed:', data.thought_id, data.error);
+                    
+                    // Reload thoughts
+                    loadThoughts();
+                    
+                    showToast('Analysis failed. Please try again.', 'error');
+                });
+
+                eventSource.onerror = function(error) {
+                    console.error('❌ SSE Connection error:', error);
+                    showConnectionStatus('disconnected');
+                    
+                    // Attempt reconnection
+                    eventSource.close();
+                    
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++;
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        console.log(`Reconnecting SSE in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                        
+                        reconnectTimeout = setTimeout(() => {
+                            connectSSE();
+                        }, delay);
+                    } else {
+                        console.error('Max reconnection attempts reached. Falling back to polling.');
+                        showToast('Real-time updates unavailable. Using refresh mode.', 'warning');
+                        // Fallback to polling
+                        setInterval(loadThoughts, 10000);
+                    }
+                };
+
+            } catch (error) {
+                console.error('Failed to create SSE connection:', error);
+                // Fallback to polling
+                setInterval(loadThoughts, 10000);
+            }
+        }
+
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+        }
+
+        function showConnectionStatus(status) {
+            // Add a subtle indicator in the header
+            let indicator = document.getElementById('connectionIndicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'connectionIndicator';
+                indicator.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    z-index: 1000;
+                    transition: all 0.3s ease;
+                    backdrop-filter: blur(10px);
+                `;
+                document.body.appendChild(indicator);
+            }
+
+            if (status === 'connected') {
+                indicator.style.background = 'rgba(52, 168, 83, 0.2)';
+                indicator.style.border = '1px solid rgba(52, 168, 83, 0.5)';
+                indicator.style.color = '#34a853';
+                indicator.innerHTML = '🟢 Live Updates';
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    indicator.style.opacity = '0';
+                }, 3000);
+            } else {
+                indicator.style.background = 'rgba(220, 53, 69, 0.2)';
+                indicator.style.border = '1px solid rgba(220, 53, 69, 0.5)';
+                indicator.style.color = '#dc3545';
+                indicator.innerHTML = '🔴 Reconnecting...';
+                indicator.style.opacity = '1';
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 30px;
+                right: 30px;
+                padding: 16px 24px;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                animation: slideIn 0.3s ease;
+                backdrop-filter: blur(10px);
+            `;
+
+            const colors = {
+                info: { bg: 'rgba(102, 126, 234, 0.2)', border: '#667eea', color: '#667eea' },
+                success: { bg: 'rgba(52, 168, 83, 0.2)', border: '#34a853', color: '#34a853' },
+                error: { bg: 'rgba(220, 53, 69, 0.2)', border: '#dc3545', color: '#dc3545' },
+                warning: { bg: 'rgba(251, 191, 36, 0.2)', border: '#fbbf24', color: '#fbbf24' }
+            };
+
+            const style = colors[type] || colors.info;
+            toast.style.background = style.bg;
+            toast.style.border = `1px solid ${style.border}`;
+            toast.style.color = style.color;
+            toast.textContent = message;
+
+            document.body.appendChild(toast);
+
+            // Add animation
+            const styleSheet = document.createElement('style');
+            styleSheet.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+
+            // Auto remove after 4 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function updateThoughtStatus(thoughtId, status, message) {
+            // Update thought card status if visible
+            const thoughtCard = document.querySelector(`[data-thought-id="${thoughtId}"]`);
+            if (thoughtCard) {
+                const statusBadge = thoughtCard.querySelector('.thought-status');
+                if (statusBadge) {
+                    statusBadge.className = `thought-status ${status}`;
+                    statusBadge.textContent = status;
+                }
+            }
+        }
+
+        // Initialize - load thoughts and connect SSE
         loadThoughts();
+        
+        if (!isAnonymous) {
+            // For authenticated users, connect SSE for real-time updates
+            connectSSE();
+        } else {
+            // For anonymous users, poll every 15 seconds (they're not getting real-time processing anyway)
+            setInterval(loadThoughts, 15000);
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            disconnectSSE();
+        });
     </script>
 </body>
 </html>
