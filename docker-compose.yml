@@ -43,37 +43,56 @@ services:
       API_PORT: 8000
       DEBUG: ${DEBUG:-false}
 
+      # Kafka & Redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
+      REDIS_URL: redis://redis:6379
+
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       db:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./api:/app
       - ./common:/app/common
+      - ./kafka:/app/kafka
       - api_logs:/app/logs
     networks:
       - thoughtprocessor-network
     restart: unless-stopped
 
-  # Batch processor (runs as cron job)
-  batch-processor:
+  # Kafka worker (replaces batch processor)
+  kafka-worker:
     build:
       context: .
       dockerfile: ./batch_processor/Dockerfile
-    container_name: thoughtprocessor-batch
     env_file:
       - .env
     environment:
-      - CONTINUOUS_MODE=true
+      - KAFKA_MODE=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
     volumes:
       - ./batch_processor:/app
       - ./common:/app/common
+      - ./kafka:/app/kafka
     depends_on:
-      - db
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
     networks:
       - thoughtprocessor-network
     command: python processor.py
+    deploy:
+      replicas: 3  # 3 workers for 3 Kafka partitions
 
   frontend:
     build: ./frontend
@@ -82,6 +101,55 @@ services:
       - "3000:80"
     depends_on:
       - api
+    networks:
+      - thoughtprocessor-network
+
+  # Kafka (KRaft mode - no Zookeeper needed)
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: thoughtprocessor-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      CLUSTER_ID: MkU3OEVBNjcyNTc4NjM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thoughtprocessor-network
+
+  # Redis for SSE pub/sub
+  redis:
+    image: redis:7-alpine
+    container_name: thoughtprocessor-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - thoughtprocessor-network
 
@@ -104,6 +172,10 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  kafka_data:
+    driver: local
+  redis_data:
     driver: local
   api_logs:
     driver: local

@@ -107,3 +107,21 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2024-01-15T10:30:00Z"
             }
         }
+
+
+class SSEEvent(BaseModel):
+    """Server-Sent Event model"""
+    event: str = Field(..., description="Event type")
+    id: Optional[str] = Field(None, description="Event ID for client tracking")
+    data: Dict[str, Any] = Field(..., description="Event data")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "event": "thought_processing",
+                "id": "evt_123",
+                "data": {"thought_id": "uuid", "status": "processing"},
+                "timestamp": "2024-01-15T10:30:00Z"
+            }
+        }

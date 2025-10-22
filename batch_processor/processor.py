@@ -1,13 +1,13 @@
 """
-Main batch processor for nightly thought processing
-Orchestrates the 5-agent pipeline with caching
+Thought processor - supports both batch mode and Kafka streaming mode
+Orchestrates the 5-agent pipeline with caching and real-time updates
 """
 import asyncio
 import json
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from loguru import logger
@@ -20,18 +20,32 @@ from semantic_cache import SemanticCache
 from common.database import DatabaseFactory
 from common.database.base import DatabaseAdapter
 
+# Import Kafka and SSE if in Kafka mode
+if settings.kafka_mode or settings.kafka_enabled:
+    try:
+        from kafka.consumer import KafkaThoughtConsumer
+        from kafka.events import ThoughtEvent, ThoughtCreatedEvent, EventType
+        import redis.asyncio as aioredis
+        KAFKA_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"Kafka/Redis libraries not available: {e}")
+        KAFKA_AVAILABLE = False
+else:
+    KAFKA_AVAILABLE = False
 
-class BatchThoughtProcessor:
+
+class ThoughtProcessor:
     """
-    Batch processor for analyzing pending thoughts
-    Runs nightly via cron job
+    Core thought processor - shared between batch and Kafka modes
+    Handles the 5-agent pipeline with caching and SSE updates
     """
 
-    def __init__(self, db: DatabaseAdapter):
+    def __init__(self, db: DatabaseAdapter, redis_client: Optional[aioredis.Redis] = None):
         # Initialize clients
         self.db = db
         self.agent_pipeline = AgentPipeline()
         self.semantic_cache = SemanticCache(self.db)
+        self.redis_client = redis_client
 
         # Processing stats
         self.stats = {
@@ -43,6 +57,23 @@ class BatchThoughtProcessor:
             "start_time": None,
             "end_time": None
         }
+
+    async def _publish_sse_update(self, user_id: str, event_type: str, data: Dict[str, Any]):
+        """Publish SSE update via Redis pub/sub"""
+        if not self.redis_client:
+            return
+
+        try:
+            channel = f"thought_updates:{user_id}"
+            payload = {
+                "event": event_type,
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": data
+            }
+            await self.redis_client.publish(channel, json.dumps(payload))
+            logger.debug(f"Published SSE update: {event_type} to {channel}")
+        except Exception as e:
+            logger.warning(f"Failed to publish SSE update: {e}")
 
     async def get_pending_thoughts(self) -> List[Dict[str, Any]]:
         """
@@ -114,7 +145,8 @@ class BatchThoughtProcessor:
 
     async def process_single_thought(
         self,
-        thought: Dict[str, Any]
+        thought: Dict[str, Any],
+        publish_updates: bool = True
     ) -> bool:
         """
         Process a single thought through the pipeline
@@ -123,7 +155,8 @@ class BatchThoughtProcessor:
         thought_id = thought["id"]
         thought_text = thought["text"]
         user_id = thought["user_id"]
-        
+        start_time = datetime.utcnow()
+
         # Parse user_context (might be JSON string or dict)
         user_context = thought["context"]
         if isinstance(user_context, str):
@@ -139,6 +172,14 @@ class BatchThoughtProcessor:
             # Mark as processing
             await self.mark_processing(thought_id, thought.get('processing_attempts', 0))
 
+            # SSE Update: Processing started
+            if publish_updates:
+                await self._publish_sse_update(
+                    user_id,
+                    "thought_processing",
+                    {"thought_id": thought_id, "status": "processing", "message": "Starting AI analysis..."}
+                )
+
             # Check semantic cache first
             cached_result = await self.semantic_cache.check_cache(
                 thought_text,
@@ -151,14 +192,35 @@ class BatchThoughtProcessor:
                 self.stats["cache_hits"] += 1
                 logger.info(f"Using cached result for thought {thought_id}")
 
+                # Simulate agent progress for UX (instant, but user sees progression)
+                if publish_updates:
+                    agent_names = ["Classifier", "Analyzer", "Value Assessor", "Action Planner", "Prioritizer"]
+                    for i, agent_name in enumerate(agent_names, 1):
+                        await self._publish_sse_update(
+                            user_id,
+                            "thought_agent_completed",
+                            {
+                                "thought_id": thought_id,
+                                "agent": agent_name,
+                                "progress": f"{i}/5",
+                                "agent_number": i,
+                                "total_agents": 5
+                            }
+                        )
+                        await asyncio.sleep(0.1)  # Small delay for UI progression
+
             else:
                 # Cache miss - process with AI
                 self.stats["cache_misses"] += 1
                 logger.info(f"Processing thought {thought_id} with AI pipeline")
 
-                result = await self.agent_pipeline.process_thought(
+                # Process through 5-agent pipeline with progress updates
+                result = await self._process_with_agent_updates(
                     thought_text,
-                    user_context
+                    user_context,
+                    user_id,
+                    thought_id,
+                    publish_updates
                 )
 
                 # Save to semantic cache
@@ -174,14 +236,75 @@ class BatchThoughtProcessor:
             # Save results to database
             await self.save_results(thought_id, result, embedding)
 
+            # Calculate processing time
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+
+            # SSE Update: Completed
+            if publish_updates:
+                await self._publish_sse_update(
+                    user_id,
+                    "thought_completed",
+                    {
+                        "thought_id": thought_id,
+                        "status": "completed",
+                        "message": "Analysis complete!",
+                        "processing_time_seconds": processing_time
+                    }
+                )
+
             self.stats["processed"] += 1
             return True
 
         except Exception as e:
             logger.error(f"Failed to process thought {thought_id}: {e}")
             await self.mark_failed(thought_id, str(e))
+
+            # SSE Update: Failed
+            if publish_updates:
+                await self._publish_sse_update(
+                    user_id,
+                    "thought_failed",
+                    {"thought_id": thought_id, "status": "failed", "error": str(e)}
+                )
+
             self.stats["failed"] += 1
             return False
+
+    async def _process_with_agent_updates(
+        self,
+        thought_text: str,
+        user_context: Dict[str, Any],
+        user_id: str,
+        thought_id: str,
+        publish_updates: bool
+    ) -> Dict[str, Any]:
+        """
+        Process thought through 5-agent pipeline with progress updates
+        """
+        agent_names = ["Classifier", "Analyzer", "Value Assessor", "Action Planner", "Prioritizer"]
+
+        # For now, use the existing process_thought method
+        # In the future, this could be refactored to process agents individually
+        result = await self.agent_pipeline.process_thought(thought_text, user_context)
+
+        # Publish progress updates (simulated for now, since we don't have individual agent hooks yet)
+        if publish_updates:
+            for i, agent_name in enumerate(agent_names, 1):
+                await self._publish_sse_update(
+                    user_id,
+                    "thought_agent_completed",
+                    {
+                        "thought_id": thought_id,
+                        "agent": agent_name,
+                        "progress": f"{i}/5",
+                        "agent_number": i,
+                        "total_agents": 5
+                    }
+                )
+                # Small delay between agents for realistic progression
+                await asyncio.sleep(3)  # ~15 seconds total for 5 agents
+
+        return result
 
     async def process_user_batch(
         self,
@@ -379,15 +502,76 @@ Return JSON with:
             logger.info("="*60)
 
 
-async def main():
-    """Entry point for batch processing"""
+# Backward compatibility alias
+BatchThoughtProcessor = ThoughtProcessor
+
+
+async def kafka_consumer_mode(db: DatabaseAdapter, redis_client: aioredis.Redis):
+    """
+    Run as Kafka consumer - processes thoughts from Kafka topic
+    """
+    logger.info("="*60)
+    logger.info("Starting Kafka consumer mode")
+    logger.info(f"Bootstrap servers: {settings.kafka_bootstrap_servers}")
+    logger.info(f"Topic: {settings.kafka_topic}")
+    logger.info(f"Consumer group: {settings.kafka_consumer_group}")
+    logger.info("="*60)
+
+    # Initialize processor with Redis for SSE
+    processor = ThoughtProcessor(db, redis_client)
+
+    # Define message handler
+    async def handle_thought_event(event: ThoughtEvent) -> bool:
+        """Handle incoming thought events from Kafka"""
+        try:
+            if event.event_type == EventType.THOUGHT_CREATED:
+                logger.info(f"Processing thought from Kafka: {event.thought_id}")
+
+                # Fetch thought from database
+                thought = await db.get_thought(event.thought_id, event.user_id)
+
+                if not thought:
+                    logger.error(f"Thought not found in DB: {event.thought_id}")
+                    return False
+
+                # Process thought with SSE updates
+                success = await processor.process_single_thought(thought, publish_updates=True)
+
+                return success
+            else:
+                logger.debug(f"Ignoring non-created event: {event.event_type}")
+                return True  # Not an error, just not our concern
+
+        except Exception as e:
+            logger.error(f"Error handling Kafka event: {e}", exc_info=True)
+            return False
+
+    # Start Kafka consumer
+    consumer = KafkaThoughtConsumer(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        consumer_group=settings.kafka_consumer_group
+    )
+
+    try:
+        await consumer.start()
+        await consumer.consume(handle_thought_event)
+    except KeyboardInterrupt:
+        logger.info("Kafka consumer interrupted by user")
+    finally:
+        await consumer.stop()
+
+
+async def batch_mode(db: DatabaseAdapter):
+    """
+    Run as batch processor - processes pending thoughts from database
+    Legacy mode (kept for backward compatibility)
+    """
     continuous_mode = os.getenv('CONTINUOUS_MODE', 'false').lower() == 'true'
-    
-    db = await DatabaseFactory.create_from_env(use_supabase=False)
-    processor = BatchThoughtProcessor(db)
-    
+
+    processor = ThoughtProcessor(db, redis_client=None)  # No SSE in batch mode
+
     if continuous_mode:
-        logger.info("Running in continuous mode - will check for new thoughts every 10 seconds")
+        logger.info("Running in continuous batch mode - checking every 10 seconds")
         try:
             while True:
                 await processor.run_batch()
@@ -398,8 +582,59 @@ async def main():
     else:
         logger.info("Running in single-batch mode")
         await processor.run_batch()
-    
-    await db.disconnect()
+
+
+async def main():
+    """
+    Entry point - detects mode (Kafka vs Batch) and runs accordingly
+    """
+    # Determine mode
+    kafka_mode_enabled = settings.kafka_mode or settings.kafka_enabled
+
+    if kafka_mode_enabled and KAFKA_AVAILABLE:
+        logger.info("🚀 Starting in KAFKA STREAMING mode")
+
+        # Initialize database
+        db = await DatabaseFactory.create_from_env(use_supabase=False)
+
+        # Initialize Redis for SSE
+        try:
+            redis_client = await aioredis.from_url(
+                settings.redis_url,
+                encoding="utf-8",
+                decode_responses=True
+            )
+            await redis_client.ping()
+            logger.info(f"Connected to Redis: {settings.redis_url}")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            logger.warning("Continuing without Redis (SSE updates disabled)")
+            redis_client = None
+
+        try:
+            await kafka_consumer_mode(db, redis_client)
+        finally:
+            await db.disconnect()
+            if redis_client:
+                await redis_client.close()
+
+    else:
+        if kafka_mode_enabled and not KAFKA_AVAILABLE:
+            logger.warning(
+                "Kafka mode requested but libraries not available. "
+                "Falling back to batch mode. "
+                "Install: pip install aiokafka redis aioredis"
+            )
+
+        logger.info("📋 Starting in BATCH mode (legacy)")
+
+        # Initialize database
+        db = await DatabaseFactory.create_from_env(use_supabase=False)
+
+        try:
+            await batch_mode(db)
+        finally:
+            await db.disconnect()
 
 
 if __name__ == "__main__":

@@ -63,6 +63,28 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # ===================================
+    # Kafka Configuration
+    # ===================================
+    kafka_enabled: bool = False
+    kafka_mode: bool = False
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_topic: str = "thought-processing"
+    kafka_consumer_group: str = "thought-workers"
+    kafka_partitions: int = 3
+
+    # ===================================
+    # Redis Configuration (for SSE)
+    # ===================================
+    redis_url: str = "redis://localhost:6379"
+    redis_sse_prefix: str = "thought_updates"
+
+    # ===================================
+    # SSE Configuration
+    # ===================================
+    sse_heartbeat_interval: int = 30
+    sse_max_connections: int = 1000
+
     class Config:
         env_file = ".env"
         case_sensitive = False

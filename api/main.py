@@ -1,8 +1,11 @@
 """
 FastAPI backend for AI Thought Processor
 Main API server with endpoints for thought management
+Supports Kafka streaming and SSE real-time updates
 """
 import os
+import asyncio
+import json
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
@@ -28,6 +31,25 @@ from models import (
 )
 from database import get_db
 from common.database.base import DatabaseAdapter
+
+# Import Kafka and SSE components
+KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "false").lower() == "true"
+
+if KAFKA_ENABLED:
+    try:
+        from sse_starlette.sse import EventSourceResponse
+        from kafka.producer import get_kafka_producer, close_kafka_producer
+        from api.sse import get_sse_manager, close_sse_manager
+        from models import SSEEvent
+        KAFKA_AVAILABLE = True
+        logger.info("Kafka streaming enabled")
+    except ImportError as e:
+        logger.warning(f"Kafka/SSE libraries not available: {e}")
+        KAFKA_AVAILABLE = False
+        KAFKA_ENABLED = False
+else:
+    KAFKA_AVAILABLE = False
+    logger.info("Kafka streaming disabled")
 
 # Import authentication
 try:
@@ -90,6 +112,39 @@ if PAYMENT_ROUTES_AVAILABLE:
     logger.info("Payment routes enabled")
 
 
+# Lifecycle events for Kafka/Redis
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Kafka producer and SSE manager on startup"""
+    if KAFKA_ENABLED and KAFKA_AVAILABLE:
+        try:
+            # Initialize Kafka producer
+            await get_kafka_producer()
+            logger.info("Kafka producer initialized")
+
+            # Initialize SSE manager
+            redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
+            await get_sse_manager(redis_url)
+            logger.info("SSE manager initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Kafka/Redis: {e}")
+            logger.warning("Continuing without Kafka/SSE support")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close Kafka producer and SSE manager on shutdown"""
+    if KAFKA_ENABLED and KAFKA_AVAILABLE:
+        try:
+            await close_kafka_producer()
+            logger.info("Kafka producer closed")
+
+            await close_sse_manager()
+            logger.info("SSE manager closed")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+
+
 @app.get("/", tags=["Health"])
 async def root():
     """Root endpoint"""
@@ -133,10 +188,10 @@ async def create_thought(
     """
     Create a new thought for processing
 
-    The thought will be saved with 'pending' status and processed
-    during the next nightly batch run.
-    
-    Requires authentication.
+    With Kafka enabled: Published to Kafka topic for real-time processing
+    Without Kafka: Saved with 'pending' status for batch processing
+
+    Requires authentication (if enabled).
     """
     try:
         # If auth is enabled, verify the user_id matches the authenticated user
@@ -146,7 +201,7 @@ async def create_thought(
                     status_code=403,
                     detail="Cannot create thoughts for other users"
                 )
-        
+
         # Verify user exists
         user = await db.get_user(str(thought.user_id))
         if not user:
@@ -155,7 +210,7 @@ async def create_thought(
                 detail=f"User {thought.user_id} not found"
             )
 
-        # Insert thought
+        # Insert thought into database
         thought_data = await db.create_thought(
             user_id=str(thought.user_id),
             text=thought.text,
@@ -169,10 +224,44 @@ async def create_thought(
 
         logger.info(f"Created thought {thought_data['id']} for user {thought.user_id}")
 
+        # If Kafka is enabled, publish event for real-time processing
+        if KAFKA_ENABLED and KAFKA_AVAILABLE:
+            try:
+                kafka_producer = await get_kafka_producer()
+                sse_manager = await get_sse_manager()
+
+                # Publish to Kafka topic
+                success = await kafka_producer.send_thought_created(
+                    user_id=str(thought.user_id),
+                    thought_id=str(thought_data["id"]),
+                    text=thought.text,
+                    user_context=user.get("context")
+                )
+
+                if success:
+                    # Broadcast SSE event (thought created)
+                    await sse_manager.broadcast_thought_created(
+                        user_id=str(thought.user_id),
+                        thought_id=str(thought_data["id"])
+                    )
+
+                    message = "Thought saved! Processing started..."
+                    logger.info(f"Published thought {thought_data['id']} to Kafka")
+                else:
+                    message = "Thought saved! Will be processed soon."
+                    logger.warning(f"Failed to publish thought {thought_data['id']} to Kafka")
+
+            except Exception as kafka_error:
+                logger.error(f"Kafka publishing error: {kafka_error}")
+                message = "Thought saved! Will be processed in next batch."
+        else:
+            # Batch mode message
+            message = "Thought saved! It will be analyzed tonight."
+
         return ThoughtResponse(
             id=thought_data["id"],
             status="pending",
-            message="Thought saved! It will be analyzed tonight.",
+            message=message,
             created_at=thought_data["created_at"]
         )
 
