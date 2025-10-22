@@ -186,6 +186,37 @@ docker compose exec db psql -U thoughtprocessor -d thoughtprocessor
 docker exec thoughtprocessor-frontend ls -la /usr/share/nginx/html/
 ```
 
+## 🧪 Running Integration Tests
+
+### Run All Tests
+```bash
+docker-compose --profile test run --rm integration-tests pytest -v
+```
+
+### Run Specific Test Suite
+```bash
+# Health checks
+docker-compose --profile test run --rm integration-tests pytest test_health.py -v
+
+# Anonymous user workflow
+docker-compose --profile test run --rm integration-tests pytest test_anonymous_user.py -v
+
+# Database operations
+docker-compose --profile test run --rm integration-tests pytest test_database.py -v
+
+# Stripe integration
+docker-compose --profile test run --rm integration-tests pytest test_stripe_integration.py -v
+```
+
+### Test Coverage
+- **13 integration tests** covering:
+  - ✅ API health checks
+  - ✅ Anonymous user workflow (thought creation, rate limiting)
+  - ✅ Database operations (users, thoughts, sessions)
+  - ✅ Stripe payment integration
+
+See [tests/README.md](tests/README.md) for detailed test documentation.
+
 ## 🎉 You're Ready!
 
 Everything is set up and running. You can now:

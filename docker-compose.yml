@@ -155,6 +155,30 @@ services:
     networks:
       - thoughtprocessor-network
 
+  # Integration tests
+  integration-tests:
+    build:
+      context: ./tests
+      dockerfile: Dockerfile
+    container_name: thoughtprocessor-tests
+    environment:
+      API_BASE_URL: http://api:8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-thoughtprocessor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-thoughtprocessor}
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - test  # Only start with: docker-compose --profile test up
+
   # Optional: pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest
