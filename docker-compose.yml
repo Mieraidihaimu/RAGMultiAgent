@@ -158,8 +158,8 @@ services:
   # Integration tests
   integration-tests:
     build:
-      context: ./tests
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./tests/Dockerfile
     container_name: thoughtprocessor-tests
     environment:
       API_BASE_URL: http://api:8000

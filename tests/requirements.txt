@@ -4,3 +4,8 @@ httpx==0.25.1
 asyncpg==0.29.0
 redis==5.0.1
 stripe==7.4.0
+aiokafka==0.10.0
+kafka-python-ng==2.2.2
+pydantic==2.5.0
+pydantic-settings==2.1.0
+loguru==0.7.2
