@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy & Consent Settings - AI Thought Processor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #48bb78;
+            --danger: #f56565;
+            --warning: #ed8936;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .back-link:hover {
+            transform: translateX(-5px);
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .consent-item {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            transition: all 0.3s;
+        }
+
+        .consent-item:hover {
+            border-color: var(--primary);
+            background: #fff;
+        }
+
+        .consent-item.locked {
+            opacity: 0.7;
+            background: #edf2f7;
+        }
+
+        .consent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .consent-title {
+            font-weight: 700;
+            color: #2d3748;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .consent-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-required {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .badge-optional {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .consent-description {
+            color: #4a5568;
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+        }
+
+        .consent-meta {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-top: 0.5rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e0;
+            transition: 0.4s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--success);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(30px);
+        }
+
+        input:disabled + .toggle-slider {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c53030;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 101, 101, 0.4);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+
+        .alert-info {
+            background: #bee3f8;
+            color: #2c5282;
+            border: 1px solid #90cdf4;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .history-table th {
+            background: #edf2f7;
+            padding: 0.875rem;
+            text-align: left;
+            font-weight: 600;
+            color: #2d3748;
+            border-bottom: 2px solid #cbd5e0;
+        }
+
+        .history-table td {
+            padding: 0.875rem;
+            border-bottom: 1px solid #e2e8f0;
+            color: #4a5568;
+        }
+
+        .history-table tr:hover {
+            background: #f7fafc;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-accepted {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-withdrawn {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .gdpr-info {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .gdpr-info h3 {
+            color: #234e52;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .gdpr-info p {
+            color: #2c7a7b;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Privacy & Consent Settings</h1>
+            <p>Manage your privacy preferences and consent settings</p>
+            <a href="index.html" class="back-link">← Back to Dashboard</a>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- GDPR Information -->
+        <div class="card">
+            <div class="gdpr-info">
+                <h3>Your Rights Under GDPR</h3>
+                <p>
+                    You have the right to access, rectify, or erase your personal data at any time.
+                    You can also withdraw consent for optional data processing. Required consents
+                    (Terms, Privacy, Data Processing) are necessary for the service to function.
+                    To withdraw these, you must delete your account.
+                </p>
+            </div>
+        </div>
+
+        <!-- Current Consent Status -->
+        <div class="card">
+            <h2>📋 Current Consent Status</h2>
+
+            <!-- Required Consents -->
+            <div class="consent-item locked">
+                <div class="consent-header">
+                    <div>
+                        <div class="consent-title">
+                            Terms of Service
+                            <span class="consent-badge badge-required">Required</span>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="terms-toggle" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="consent-description">
+                    Acceptance of our Terms of Service is required to use the platform.
+                </p>
+                <p class="consent-meta" id="terms-meta">Loading...</p>
+            </div>
+
+            <div class="consent-item locked">
+                <div class="consent-header">
+                    <div>
+                        <div class="consent-title">
+                            Privacy Policy
+                            <span class="consent-badge badge-required">Required</span>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="privacy-toggle" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="consent-description">
+                    Acceptance of our Privacy Policy is required to use the platform.
+                </p>
+                <p class="consent-meta" id="privacy-meta">Loading...</p>
+            </div>
+
+            <div class="consent-item locked">
+                <div class="consent-header">
+                    <div>
+                        <div class="consent-title">
+                            AI Data Processing
+                            <span class="consent-badge badge-required">Required</span>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="data-processing-toggle" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="consent-description">
+                    Consent for AI to process your data is essential for the service to function.
+                </p>
+                <p class="consent-meta" id="data-processing-meta">Loading...</p>
+            </div>
+
+            <!-- Optional Consents -->
+            <div class="consent-item">
+                <div class="consent-header">
+                    <div>
+                        <div class="consent-title">
+                            Marketing Communications
+                            <span class="consent-badge badge-optional">Optional</span>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="marketing-toggle" onchange="updateConsent('marketing')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="consent-description">
+                    Receive product updates, feature announcements, and promotional emails.
+                    You can unsubscribe at any time.
+                </p>
+                <p class="consent-meta" id="marketing-meta">Loading...</p>
+            </div>
+
+            <div class="consent-item">
+                <div class="consent-header">
+                    <div>
+                        <div class="consent-title">
+                            Analytics Tracking
+                            <span class="consent-badge badge-optional">Optional</span>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="analytics-toggle" onchange="updateConsent('analytics')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="consent-description">
+                    Help us improve the product by allowing anonymous usage analytics.
+                    This helps us understand how features are used.
+                </p>
+                <p class="consent-meta" id="analytics-meta">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Consent History -->
+        <div class="card">
+            <h2>📜 Consent History</h2>
+            <p style="color: #718096; margin-bottom: 1rem;">
+                Complete audit trail of all your consent changes (GDPR Article 7.1 compliance)
+            </p>
+
+            <div id="historyContainer">
+                <p style="text-align: center; color: #718096; padding: 2rem;">Loading history...</p>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border: 2px solid var(--danger);">
+            <h2 style="color: var(--danger);">⚠️ Danger Zone</h2>
+            <p style="color: #718096; margin-bottom: 1.5rem;">
+                Withdrawing all consents will initiate account deletion. Your data will be
+                permanently deleted within 30 days.
+            </p>
+            <button class="btn btn-danger" onclick="withdrawAllConsents()">
+                Withdraw All Consents & Delete Account
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let authToken = localStorage.getItem('auth_token');
+
+        // Check authentication
+        if (!authToken) {
+            window.location.href = 'login.html';
+        }
+
+        // Load consent status on page load
+        loadConsentStatus();
+        loadConsentHistory();
+
+        async function loadConsentStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/consent/status`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load consent status');
+                }
+
+                const data = await response.json();
+
+                // Update required consents metadata
+                updateConsentMeta('terms', data.required_consents.terms);
+                updateConsentMeta('privacy', data.required_consents.privacy);
+                updateConsentMeta('data-processing', data.required_consents.data_processing);
+
+                // Update optional consents
+                const marketingToggle = document.getElementById('marketing-toggle');
+                const analyticsToggle = document.getElementById('analytics-toggle');
+
+                marketingToggle.checked = data.optional_consents.marketing.accepted;
+                analyticsToggle.checked = data.optional_consents.analytics.accepted;
+
+                updateConsentMeta('marketing', data.optional_consents.marketing);
+                updateConsentMeta('analytics', data.optional_consents.analytics);
+
+            } catch (error) {
+                console.error('Error loading consent status:', error);
+                showAlert('error', 'Failed to load consent status');
+            }
+        }
+
+        function updateConsentMeta(type, data) {
+            const metaElement = document.getElementById(`${type}-meta`);
+            if (data.accepted) {
+                const date = new Date(data.accepted_at).toLocaleString();
+                const version = data.version ? ` (Version ${data.version})` : '';
+                metaElement.textContent = `Accepted on ${date}${version}`;
+            } else {
+                metaElement.textContent = 'Not yet accepted';
+            }
+        }
+
+        async function updateConsent(consentType) {
+            const toggle = document.getElementById(`${consentType}-toggle`);
+            const newValue = toggle.checked;
+
+            // Disable toggle during update
+            toggle.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/consent/update`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        [consentType]: newValue
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update consent');
+                }
+
+                const result = await response.json();
+                showAlert('success', `${consentType.charAt(0).toUpperCase() + consentType.slice(1)} consent updated successfully`);
+
+                // Reload consent status and history
+                await loadConsentStatus();
+                await loadConsentHistory();
+
+                // Update localStorage
+                if (consentType === 'analytics') {
+                    localStorage.setItem('analytics_enabled', newValue ? 'true' : 'false');
+                } else if (consentType === 'marketing') {
+                    localStorage.setItem('marketing_enabled', newValue ? 'true' : 'false');
+                }
+
+            } catch (error) {
+                console.error('Error updating consent:', error);
+                showAlert('error', 'Failed to update consent preference');
+                // Revert toggle
+                toggle.checked = !newValue;
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        async function loadConsentHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/consent/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load consent history');
+                }
+
+                const history = await response.json();
+                displayHistory(history);
+
+            } catch (error) {
+                console.error('Error loading consent history:', error);
+                document.getElementById('historyContainer').innerHTML =
+                    '<p style="text-align: center; color: #e53e3e; padding: 2rem;">Failed to load history</p>';
+            }
+        }
+
+        function displayHistory(history) {
+            const container = document.getElementById('historyContainer');
+
+            if (!history || history.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #718096; padding: 2rem;">No consent history available</p>';
+                return;
+            }
+
+            const table = `
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Consent Type</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                            <th>Version</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${history.map(entry => `
+                            <tr>
+                                <td>${new Date(entry.consent_timestamp).toLocaleString()}</td>
+                                <td style="text-transform: capitalize;">${entry.consent_type.replace('_', ' ')}</td>
+                                <td>
+                                    <span class="status-badge ${entry.consent_given ? 'status-accepted' : 'status-withdrawn'}">
+                                        ${entry.consent_given ? 'Accepted' : 'Withdrawn'}
+                                    </span>
+                                </td>
+                                <td style="text-transform: capitalize;">${entry.action}</td>
+                                <td>${entry.consent_version || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = table;
+        }
+
+        async function withdrawAllConsents() {
+            if (!confirm('⚠️ WARNING: This will delete your account and all your data.\n\nYour data will be permanently deleted within 30 days. This action cannot be undone.\n\nAre you sure you want to proceed?')) {
+                return;
+            }
+
+            if (!confirm('This is your final warning. Type "DELETE" to confirm.\n\nClick OK if you typed DELETE.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/consent/withdraw-all`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to withdraw consents');
+                }
+
+                const result = await response.json();
+
+                showAlert('info', result.message);
+
+                // Clear all local storage and redirect after 5 seconds
+                setTimeout(() => {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                }, 5000);
+
+            } catch (error) {
+                console.error('Error withdrawing consents:', error);
+                showAlert('error', 'Failed to process consent withdrawal');
+            }
+        }
+
+        function showAlert(type, message) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = `alert-${type}`;
+
+            alertContainer.innerHTML = `
+                <div class="alert ${alertClass}">
+                    ${message}
+                </div>
+            `;
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertContainer.innerHTML = '';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

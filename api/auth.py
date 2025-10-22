@@ -27,10 +27,21 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
     email: Optional[str] = None
 
+class ConsentData(BaseModel):
+    """User consent information for GDPR compliance"""
+    terms_accepted: bool
+    terms_version: str = "1.0"
+    privacy_accepted: bool
+    privacy_version: str = "1.0"
+    marketing: bool = False
+    analytics: bool = False
+    data_processing: bool = True
+
 class UserSignup(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    consent: ConsentData
 
 class UserLogin(BaseModel):
     email: str
@@ -41,6 +52,21 @@ class UserResponse(BaseModel):
     email: str
     name: Optional[str] = None
     created_at: datetime
+    consent_status: Optional[dict] = None
+
+class ConsentUpdate(BaseModel):
+    """Model for updating user consent preferences"""
+    marketing: Optional[bool] = None
+    analytics: Optional[bool] = None
+
+class ConsentHistoryResponse(BaseModel):
+    """Response model for consent history"""
+    id: str
+    consent_type: str
+    consent_given: bool
+    consent_version: Optional[str] = None
+    consent_timestamp: datetime
+    action: str
 
 # Password utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:

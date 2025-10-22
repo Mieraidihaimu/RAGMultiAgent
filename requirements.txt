@@ -32,10 +32,10 @@ python-dateutil==2.8.2
 stripe==8.2.0
 
 # Authentication & Security
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-slowapi==0.1.9
+python-jose[cryptography]==3.3.0  # JWT tokens + cryptography lib for AES-256-GCM encryption
+passlib[bcrypt]==1.7.4  # Password hashing
+python-multipart==0.0.6  # Form data parsing
+slowapi==0.1.9  # Rate limiting
 
 # Kafka Streaming
 aiokafka==0.10.0
