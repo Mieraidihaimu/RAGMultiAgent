@@ -355,6 +355,47 @@ services:
     profiles:
       - monitoring
 
+  # Elasticsearch for search comparison
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: thoughtprocessor-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - search
+
+  # Search comparison service
+  search-comparison:
+    build:
+      context: .
+      dockerfile: ./search_comparison/Dockerfile
+    container_name: thoughtprocessor-search
+    ports:
+      - "8001:8001"
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - search
+
 volumes:
   postgres_data:
     driver: local
@@ -373,6 +414,8 @@ volumes:
   loki_data:
     driver: local
   tempo_data:
+    driver: local
+  es_data:
     driver: local
 
 networks:
