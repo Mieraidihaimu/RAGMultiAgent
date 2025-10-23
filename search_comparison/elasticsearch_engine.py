@@ -73,6 +73,9 @@ class ElasticsearchEngine:
                     },
                     "category": {"type": "keyword"},
                     "tags": {"type": "keyword"},
+                    "user_id": {"type": "keyword"},
+                    "group_id": {"type": "keyword"},
+                    "status": {"type": "keyword"},
                     "created_at": {"type": "date"}
                 }
             }
@@ -93,7 +96,18 @@ class ElasticsearchEngine:
             for doc in documents
         ]
         
-        success, failed = bulk(self.es, actions, refresh=True)
+        try:
+            success, failed = bulk(self.es, actions, refresh=True, raise_on_error=False)
+        except Exception as e:
+            print(f"Bulk indexing error: {e}")
+            if hasattr(e, 'errors'):
+                for error in e.errors:
+                    print(f"Document error: {error}")
+            raise
+        
+        # Print detailed errors if any failed
+        if failed:
+            print(f"Warning: {failed} documents failed to index")
         
         elapsed = time.time() - start_time
         

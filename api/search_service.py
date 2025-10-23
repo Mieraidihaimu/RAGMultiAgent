@@ -140,6 +140,30 @@ class ThoughtSearchService:
             if not thought_id:
                 raise ValueError("Thought missing 'id' field")
             
+            # Format created_at to ISO 8601 (without microseconds)
+            created_at = thought.get("created_at", "")
+            if created_at:
+                # Convert to string and remove microseconds if present
+                created_at_str = str(created_at)
+                # Remove microseconds (e.g., .969532) and keep timezone
+                if '.' in created_at_str and ('+' in created_at_str or 'Z' in created_at_str):
+                    # Split on microseconds
+                    parts = created_at_str.split('.')
+                    if len(parts) == 2:
+                        # Get timezone part
+                        tz_part = parts[1].split('+')[-1] if '+' in parts[1] else (parts[1].split('Z')[-1] if 'Z' in parts[1] else '')
+                        # Rebuild without microseconds: date+time+timezone
+                        if '+' in parts[1]:
+                            created_at_str = f"{parts[0]}+{tz_part}"
+                        elif 'Z' in parts[1]:
+                            created_at_str = f"{parts[0]}Z"
+                        else:
+                            created_at_str = parts[0]
+                # Replace space with 'T' for ISO 8601
+                created_at_str = created_at_str.replace(' ', 'T')
+            else:
+                created_at_str = ""
+            
             return {
                 "id": f"thought_{thought_id}",
                 "title": str(thought.get("text", ""))[:100],  # First 100 chars as title
@@ -148,7 +172,7 @@ class ThoughtSearchService:
                 "tags": self._extract_tags(thought),
                 "user_id": str(thought.get("user_id", "")),
                 "status": str(thought.get("status", "")),
-                "created_at": str(thought.get("created_at", "")),
+                "created_at": created_at_str,
                 "metadata": {
                     "thought_id": str(thought_id),
                     "processing_mode": str(thought.get("processing_mode", "single")),
