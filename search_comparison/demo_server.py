@@ -8,11 +8,11 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import time
 
-from config import ES_CONFIG, SEMANTIC_CONFIG, HYBRID_CONFIG
-from elasticsearch_engine import ElasticsearchEngine
-from semantic_engine import SemanticEngine
-from hybrid_engine import HybridEngine
-from sample_data import get_sample_documents
+from .config import ES_CONFIG, SEMANTIC_CONFIG, HYBRID_CONFIG
+from .elasticsearch_engine import ElasticsearchEngine
+from .semantic_engine import SemanticEngine
+from .hybrid_engine import HybridEngine
+from .sample_data import get_sample_documents
 
 app = FastAPI(title="Search Comparison API", version="1.0.0")
 

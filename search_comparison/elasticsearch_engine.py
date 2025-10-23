@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
-from config import ElasticsearchConfig
+from .config import ElasticsearchConfig
 
 
 class ElasticsearchEngine:

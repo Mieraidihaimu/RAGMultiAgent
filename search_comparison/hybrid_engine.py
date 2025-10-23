@@ -2,9 +2,9 @@
 from typing import List, Dict, Any, Optional
 import time
 
-from elasticsearch_engine import ElasticsearchEngine
-from semantic_engine import SemanticEngine
-from config import HybridConfig
+from .elasticsearch_engine import ElasticsearchEngine
+from .semantic_engine import SemanticEngine
+from .config import HybridConfig
 
 
 class HybridEngine:

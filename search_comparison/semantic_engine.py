@@ -6,7 +6,7 @@ import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
-from config import SemanticConfig
+from .config import SemanticConfig
 
 
 class SemanticEngine:
