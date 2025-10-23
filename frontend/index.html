@@ -114,7 +114,8 @@
             }
         }
 
-        .btn-manage-groups {
+        .btn-manage-groups,
+        .btn-search {
             padding: 6px 14px;
             background: rgba(99, 102, 241, 0.1);
             border: 1px solid rgba(99, 102, 241, 0.3);
@@ -130,7 +131,8 @@
             gap: 6px;
         }
 
-        .btn-manage-groups:hover {
+        .btn-manage-groups:hover,
+        .btn-search:hover {
             background: rgba(99, 102, 241, 0.2);
             border-color: rgba(99, 102, 241, 0.5);
         }
@@ -1305,6 +1307,7 @@
 
         <div class="user-menu">
             <span class="user-email" id="userEmail"></span>
+            <a href="search.html" class="btn-search">🔍 Search</a>
             <a href="groups.html" class="btn-manage-groups">👥 Groups</a>
             <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
