@@ -252,6 +252,12 @@
 </head>
 <body>
     <div class="container">
+        <div style="text-align: left; margin-bottom: 20px;">
+            <a href="index.html" style="color: #667eea; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+                ← Back to Home
+            </a>
+        </div>
+        
         <h1>🔍 Thought Search</h1>
         <p class="subtitle">Search your thoughts and processing results with hybrid AI</p>
         
@@ -311,6 +317,19 @@
     <script>
         const API_BASE = 'http://localhost:8000';
         
+        // Check authentication on page load
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            const userId = localStorage.getItem('user_id');
+            
+            if (!token || !userId) {
+                // Redirect to landing page if not authenticated
+                window.location.href = 'landing.html';
+                return false;
+            }
+            return true;
+        }
+        
         // Get authentication headers
         function getAuthHeaders() {
             const token = localStorage.getItem('auth_token');
@@ -322,6 +341,13 @@
             }
             return headers;
         }
+        
+        // Run auth check on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!checkAuth()) {
+                return; // Will redirect, so stop execution
+            }
+        });
         
         async function search(queryText) {
             const resultsDiv = document.getElementById('results');
@@ -379,11 +405,27 @@
             const resultsDiv = document.getElementById('results');
             
             if (!data.results || data.results.length === 0) {
+                const userId = localStorage.getItem('user_id');
+                const indexUrl = `${API_BASE}/search/index/rebuild?user_id=${userId}`;
+                
                 resultsDiv.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">🤷</div>
                         <p>No thoughts found matching "${data.query}"</p>
-                        <p style="font-size: 14px; margin-top: 10px;">Try a different search term or check your filters</p>
+                        <p style="font-size: 14px; margin-top: 10px; margin-bottom: 15px;">
+                            This could mean:
+                        </p>
+                        <ul style="text-align: left; max-width: 400px; margin: 0 auto; font-size: 14px; color: #666;">
+                            <li>Your thoughts haven't been indexed yet</li>
+                            <li>No thoughts match your search query</li>
+                            <li>Try a different search term or broader keywords</li>
+                        </ul>
+                        <div style="margin-top: 20px;">
+                            <button onclick="rebuildIndex()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                                📚 Index My Thoughts
+                            </button>
+                            <p style="font-size: 12px; color: #999; margin-top: 8px;">Click to make all your thoughts searchable</p>
+                        </div>
                     </div>
                 `;
                 return;
@@ -512,6 +554,55 @@
             div.textContent = text;
             return div.innerHTML;
         }
+        
+        async function rebuildIndex() {
+            const userId = localStorage.getItem('user_id');
+            if (!userId) {
+                alert('User ID not found. Please log in again.');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔄 Indexing your thoughts... This may take a moment.</div>';
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/search/index/rebuild?user_id=${userId}`,
+                    {
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    }
+                );
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to rebuild index: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = `
+                    <div class="result-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); border: 2px solid #10b981;">
+                        <div class="result-title" style="color: #10b981;">✅ Indexing Complete!</div>
+                        <div class="result-content">
+                            <p><strong>${data.indexed}</strong> thoughts have been indexed and are now searchable.</p>
+                            <p style="margin-top: 10px; font-size: 14px;">You can now search your thoughts using the search box above.</p>
+                        </div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="result-card error">
+                        <div class="result-title">❌ Indexing Failed</div>
+                        <div class="result-content">${error.message}</div>
+                        <div class="result-content" style="font-size: 12px; margin-top: 10px;">
+                            Make sure you have created some thoughts first. Go to <a href="index.html" style="color: #667eea;">the main page</a> to create thoughts.
+                        </div>
+                    </div>
+                `;
+            }
+        }
     </script>
+```
 </body>
 </html>
