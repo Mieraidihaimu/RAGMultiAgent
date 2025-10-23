@@ -985,37 +985,67 @@ async def stream_events(
                 
                 logger.info(f"SSE stream started for user {user_id}")
                 
-                # Listen for messages
-                async for message in pubsub.listen():
-                    if message["type"] == "message":
-                        try:
-                            payload = json.loads(message["data"])
-                            event_type = payload.get("event", "message")
-                            event_data = payload.get("data", {})
-                            event_id = payload.get("event_id")
-                            
-                            # Format as SSE
-                            sse_event = {
-                                "event": event_type,
-                                "data": json.dumps(event_data)
-                            }
-                            
-                            if event_id:
-                                sse_event["id"] = event_id
-                            
-                            yield sse_event
-                            
-                        except json.JSONDecodeError as e:
-                            logger.error(f"Invalid JSON in Redis message: {e}")
+                # Listen for messages using get_message with timeout
+                # This approach is more compatible with SSE streaming
+                while True:
+                    try:
+                        # Check if client disconnected
+                        if await request.is_disconnected():
+                            logger.info(f"Client disconnected: user {user_id}")
+                            break
+                        
+                        # Get message with timeout to allow checking for disconnection
+                        message = await asyncio.wait_for(
+                            pubsub.get_message(ignore_subscribe_messages=True),
+                            timeout=1.0
+                        )
+                        
+                        if message is None:
+                            # No message available, continue waiting
+                            await asyncio.sleep(0.1)
                             continue
-                    
-                    # Check if client disconnected
-                    if await request.is_disconnected():
-                        logger.info(f"Client disconnected: user {user_id}")
-                        break
+                        
+                        msg_type = message.get("type", "unknown")
+                        
+                        if msg_type == "message":
+                            try:
+                                msg_data = message.get("data", "{}")
+                                logger.debug(f"SSE received message: {msg_data[:200]}")
+                                
+                                payload = json.loads(msg_data)
+                                event_type = payload.get("event", "message")
+                                event_data = payload.get("data", {})
+                                event_id = payload.get("event_id")
+                                
+                                logger.info(f"SSE forwarding event: {event_type} for user {user_id}")
+                                
+                                # Format as SSE
+                                sse_event = {
+                                    "event": event_type,
+                                    "data": json.dumps(event_data)
+                                }
+                                
+                                if event_id:
+                                    sse_event["id"] = event_id
+                                
+                                yield sse_event
+                                
+                            except json.JSONDecodeError as e:
+                                logger.error(f"Invalid JSON in Redis message: {e}")
+                                logger.error(f"Raw message data: {message.get('data', 'N/A')}")
+                                continue
+                                
+                    except asyncio.TimeoutError:
+                        # Timeout waiting for message - this is normal, continue loop
+                        await asyncio.sleep(0.1)
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error getting message from pubsub: {e}")
+                        await asyncio.sleep(1)
+                        continue
                         
             except Exception as e:
-                logger.error(f"Error in SSE stream: {e}")
+                logger.error(f"Error in SSE stream: {e}", exc_info=True)
                 yield {
                     "event": "error",
                     "data": json.dumps({"error": str(e)})

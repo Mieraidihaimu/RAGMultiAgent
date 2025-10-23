@@ -42,7 +42,6 @@ aiokafka==0.10.0
 
 # Redis for SSE pub/sub
 redis==5.0.1
-aioredis==2.0.1
 
 # Server-Sent Events
 sse-starlette==1.8.2
