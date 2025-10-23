@@ -1,0 +1,35 @@
+time="2025-10-23T17:42:33+01:00" level=warning msg="Found orphan containers ([thoughtprocessor-search thoughtprocessor-elasticsearch thoughtprocessor-batch]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up."
+ Container thoughtprocessor-redis  Running
+ Container thoughtprocessor-kafka  Running
+ Container thoughtprocessor-db  Running
+ Container thoughtprocessor-api  Running
+ Container thoughtprocessor-db  Waiting
+ Container thoughtprocessor-kafka  Waiting
+ Container thoughtprocessor-redis  Waiting
+ Container thoughtprocessor-redis  Healthy
+ Container thoughtprocessor-db  Healthy
+ Container thoughtprocessor-kafka  Healthy
+============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-7.4.3, pluggy-1.6.0 -- /usr/local/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /tests
+plugins: anyio-4.11.0, asyncio-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 27 items
+
+test_anonymous_user.py::test_anonymous_thought_creation PASSED           [  3%]
+test_anonymous_user.py::test_anonymous_rate_limit PASSED                 [  7%]
+test_anonymous_user.py::test_anonymous_session_info PASSED               [ 11%]
+test_anonymous_user.py::test_anonymous_get_thoughts PASSED               [ 14%]
+test_database.py::test_database_connection PASSED                        [ 18%]
+test_database.py::test_create_and_retrieve_user PASSED                   [ 22%]
+test_database.py::test_create_and_retrieve_thought PASSED                [ 25%]
+test_database.py::test_anonymous_session_creation PASSED                 [ 29%]
+test_health.py::test_api_health PASSED                                   [ 33%]
+test_health.py::test_api_root PASSED                                     [ 37%]
+test_kafka_direct.py::test_kafka_producer_connection PASSED              [ 40%]
+test_kafka_direct.py::test_kafka_consumer_connection PASSED              [ 44%]
+test_kafka_direct.py::test_kafka_producer_send_thought_created_event PASSED [ 48%]
+test_kafka_direct.py::test_kafka_producer_send_multiple_event_types PASSED [ 51%]
+test_kafka_direct.py::test_kafka_consumer_receives_messages PASSED       [ 55%]
+test_kafka_direct.py::test_kafka_producer_consumer_full_workflow 

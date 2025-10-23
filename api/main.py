@@ -12,6 +12,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -114,14 +115,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 instrumentator = Instrumentator(
     should_group_status_codes=False,
     should_ignore_untemplated=True,
-    should_respect_env_var=True,
+    should_respect_env_var=False,
     should_instrument_requests_inprogress=True,
-    excluded_handlers=[".*admin.*", "/metrics"],
-    env_var_name="ENABLE_METRICS",
+    excluded_handlers=[".*admin.*"],
     inprogress_name="http_requests_inprogress",
     inprogress_labels=True
 )
 instrumentator.instrument(app).expose(app, endpoint="/metrics")
+
+# Add Gzip compression middleware
+# Compresses responses > 1KB for improved performance
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Configure CORS
 app.add_middleware(
