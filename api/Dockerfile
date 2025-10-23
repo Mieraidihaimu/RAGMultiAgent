@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY api/ /app/
 COPY common/ /app/common/
+COPY search_comparison/ /app/search_comparison/
 
 # Create logs directory
 RUN mkdir -p /app/logs

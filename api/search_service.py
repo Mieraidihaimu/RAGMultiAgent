@@ -3,13 +3,9 @@ Hybrid search service for thoughts and processing results.
 Combines Elasticsearch keyword search with semantic vector search.
 """
 import os
-import sys
 import json
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-
-# Add search_comparison to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from search_comparison.config import (
     ElasticsearchConfig,

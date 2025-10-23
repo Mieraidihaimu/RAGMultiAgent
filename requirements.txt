@@ -55,4 +55,10 @@ prometheus-fastapi-instrumentator==6.1.0
 pytest==7.4.4
 pytest-asyncio==0.23.3
 
+# Search (Hybrid Search for Thoughts)
+elasticsearch==8.11.0
+sentence-transformers>=2.2.2
+chromadb>=0.4.18
+tiktoken>=0.5.1
+
 # Invalidate cache
