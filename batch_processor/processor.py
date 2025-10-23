@@ -117,24 +117,48 @@ class ThoughtProcessor:
         result: Dict[str, Any],
         embedding: List[float] = None
     ):
-        """Save processing results to database"""
+        """
+        Save processing results to database
+        Handles both single mode and group mode results
+        """
         try:
-            update_data = {
-                "status": "completed",
-                "processed_at": datetime.utcnow(),
-                "classification": result.get("classification"),
-                "analysis": result.get("analysis"),
-                "value_impact": result.get("value_impact"),
-                "action_plan": result.get("action_plan"),
-                "priority": result.get("priority")
-            }
+            # Check if this is group mode result
+            if result.get("mode") == "group":
+                # Group mode: save consolidated output (convert dict to JSON string)
+                consolidated = result.get("consolidated")
+                if isinstance(consolidated, dict):
+                    consolidated = json.dumps(consolidated)
+                
+                update_data = {
+                    "status": "completed",
+                    "processed_at": datetime.utcnow(),
+                    "consolidated_output": consolidated,
+                    # Clear single-mode fields for group mode
+                    "classification": None,
+                    "analysis": None,
+                    "value_impact": None,
+                    "action_plan": None,
+                    "priority": None
+                }
+            else:
+                # Single mode: save individual agent outputs
+                update_data = {
+                    "status": "completed",
+                    "processed_at": datetime.utcnow(),
+                    "classification": result.get("classification"),
+                    "analysis": result.get("analysis"),
+                    "value_impact": result.get("value_impact"),
+                    "action_plan": result.get("action_plan"),
+                    "priority": result.get("priority"),
+                    "consolidated_output": None
+                }
 
             if embedding:
                 update_data["embedding"] = embedding
 
             await self.db.update_thought(thought_id, **update_data)
 
-            logger.info(f"Saved results for thought {thought_id}")
+            logger.info(f"Saved results for thought {thought_id} (mode: {result.get('mode', 'single')})")
 
         except Exception as e:
             logger.error(f"Failed to save results for thought {thought_id}: {e}")
@@ -161,11 +185,14 @@ class ThoughtProcessor:
     ) -> bool:
         """
         Process a single thought through the pipeline
+        Supports both 'single' and 'group' processing modes
         Returns True if successful, False otherwise
         """
         thought_id = thought["id"]
         thought_text = thought["text"]
         user_id = thought["user_id"]
+        processing_mode = thought.get("processing_mode", "single")
+        group_id = thought.get("group_id")
         start_time = datetime.utcnow()
 
         # Parse user_context (might be JSON string or dict)
@@ -188,63 +215,38 @@ class ThoughtProcessor:
                 await self._publish_sse_update(
                     user_id,
                     "thought_processing",
-                    {"thought_id": thought_id, "status": "processing", "message": "Starting AI analysis..."}
+                    {
+                        "thought_id": thought_id,
+                        "status": "processing",
+                        "mode": processing_mode,
+                        "message": "Starting AI analysis..."
+                    }
                 )
 
-            # Check semantic cache first
-            cached_result = await self.semantic_cache.check_cache(
-                thought_text,
-                user_id
-            )
-
-            if cached_result:
-                # Cache hit - use cached result
-                result = cached_result
-                self.stats["cache_hits"] += 1
-                logger.info(f"Using cached result for thought {thought_id}")
-
-                # Simulate agent progress for UX (instant, but user sees progression)
-                if publish_updates:
-                    agent_names = ["Classifier", "Analyzer", "Value Assessor", "Action Planner", "Prioritizer"]
-                    for i, agent_name in enumerate(agent_names, 1):
-                        await self._publish_sse_update(
-                            user_id,
-                            "thought_agent_completed",
-                            {
-                                "thought_id": thought_id,
-                                "agent": agent_name,
-                                "progress": f"{i}/5",
-                                "agent_number": i,
-                                "total_agents": 5
-                            }
-                        )
-                        await asyncio.sleep(0.1)  # Small delay for UI progression
-
-            else:
-                # Cache miss - process with AI
-                self.stats["cache_misses"] += 1
-                logger.info(f"Processing thought {thought_id} with AI pipeline")
-
-                # Process through 5-agent pipeline with progress updates
-                result = await self._process_with_agent_updates(
-                    thought_text,
-                    user_context,
-                    user_id,
+            # Route to appropriate processing method based on mode
+            if processing_mode == "group" and group_id:
+                result = await self._process_group_mode(
                     thought_id,
+                    thought_text,
+                    user_id,
+                    user_context,
+                    group_id,
                     publish_updates
                 )
-
-                # Save to semantic cache
-                await self.semantic_cache.save_to_cache(
+            else:
+                # Default single mode processing
+                result = await self._process_single_mode(
+                    thought_id,
                     thought_text,
                     user_id,
-                    result
+                    user_context,
+                    publish_updates
                 )
 
             # Get embedding for the thought (for semantic search later)
             embedding = await self.semantic_cache.get_embedding(thought_text)
 
-            # Save results to database
+            # Save results to database (mode-specific)
             await self.save_results(thought_id, result, embedding)
 
             # Calculate processing time
@@ -258,6 +260,7 @@ class ThoughtProcessor:
                     {
                         "thought_id": thought_id,
                         "status": "completed",
+                        "mode": processing_mode,
                         "message": "Analysis complete!",
                         "processing_time_seconds": processing_time
                     }
@@ -280,6 +283,166 @@ class ThoughtProcessor:
 
             self.stats["failed"] += 1
             return False
+
+    async def _process_single_mode(
+        self,
+        thought_id: str,
+        thought_text: str,
+        user_id: str,
+        user_context: Dict[str, Any],
+        publish_updates: bool
+    ) -> Dict[str, Any]:
+        """
+        Process thought in single mode (personal LLM feedback)
+        Uses semantic caching
+        """
+        # Check semantic cache first
+        cached_result = await self.semantic_cache.check_cache(
+            thought_text,
+            user_id
+        )
+
+        if cached_result:
+            # Cache hit - use cached result
+            result = cached_result
+            self.stats["cache_hits"] += 1
+            logger.info(f"Using cached result for thought {thought_id}")
+
+            # Simulate agent progress for UX (instant, but user sees progression)
+            if publish_updates:
+                agent_names = ["Classifier", "Analyzer", "Value Assessor", "Action Planner", "Prioritizer"]
+                for i, agent_name in enumerate(agent_names, 1):
+                    await self._publish_sse_update(
+                        user_id,
+                        "thought_agent_completed",
+                        {
+                            "thought_id": thought_id,
+                            "agent": agent_name,
+                            "progress": f"{i}/5",
+                            "agent_number": i,
+                            "total_agents": 5
+                        }
+                    )
+                    await asyncio.sleep(0.1)  # Small delay for UI progression
+
+        else:
+            # Cache miss - process with AI
+            self.stats["cache_misses"] += 1
+            logger.info(f"Processing thought {thought_id} with AI pipeline")
+
+            # Process through 5-agent pipeline with progress updates
+            result = await self._process_with_agent_updates(
+                thought_text,
+                user_context,
+                user_id,
+                thought_id,
+                publish_updates
+            )
+
+            # Save to semantic cache
+            await self.semantic_cache.save_to_cache(
+                thought_text,
+                user_id,
+                result
+            )
+
+        return result
+
+    async def _process_group_mode(
+        self,
+        thought_id: str,
+        thought_text: str,
+        user_id: str,
+        user_context: Dict[str, Any],
+        group_id: str,
+        publish_updates: bool
+    ) -> Dict[str, Any]:
+        """
+        Process thought in group mode (multiple persona perspectives)
+        No caching for group mode (too many variations)
+        """
+        import time
+
+        # Fetch group and personas
+        group = await self.db.get_persona_group(group_id, include_personas=True)
+        
+        if not group:
+            raise ValueError(f"Persona group {group_id} not found")
+        
+        personas = group.get('personas', [])
+        
+        if not personas:
+            raise ValueError(f"Persona group {group_id} has no personas")
+        
+        logger.info(f"Processing thought {thought_id} with {len(personas)} personas from group '{group['name']}'")
+
+        # SSE Update: Group processing started
+        if publish_updates:
+            await self._publish_sse_update(
+                user_id,
+                "group_processing_started",
+                {
+                    "thought_id": thought_id,
+                    "group_name": group['name'],
+                    "persona_count": len(personas)
+                }
+            )
+
+        # Process through all personas in parallel
+        result = await self.agent_pipeline.process_thought_with_group(
+            thought_text,
+            user_context,
+            personas
+        )
+
+        # Publish persona-level SSE updates
+        if publish_updates:
+            for i, persona_output in enumerate(result['persona_outputs'], 1):
+                await self._publish_sse_update(
+                    user_id,
+                    "persona_completed",
+                    {
+                        "thought_id": thought_id,
+                        "persona_id": persona_output['persona_id'],
+                        "persona_name": persona_output['persona_name'],
+                        "progress": f"{i}/{len(personas)}",
+                        "has_error": persona_output['error'] is not None
+                    }
+                )
+            
+            # Consolidation started
+            await self._publish_sse_update(
+                user_id,
+                "consolidation_started",
+                {
+                    "thought_id": thought_id,
+                    "message": "Synthesizing perspectives..."
+                }
+            )
+
+        # Save individual persona runs to database
+        for persona_output in result['persona_outputs']:
+            if persona_output['error'] is None:
+                try:
+                    processing_time_ms = int(result.get('processing_time_seconds', 0) * 1000)
+                    
+                    # Convert persona output to JSON string
+                    output_json = persona_output['output']
+                    if isinstance(output_json, dict):
+                        output_json = json.dumps(output_json)
+                    
+                    await self.db.create_thought_persona_run(
+                        thought_id=thought_id,
+                        persona_id=persona_output['persona_id'],
+                        group_id=group_id,
+                        persona_name=persona_output['persona_name'],
+                        persona_output=output_json,
+                        processing_time_ms=processing_time_ms
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to save persona run: {e}")
+
+        return result
 
     async def _process_with_agent_updates(
         self,

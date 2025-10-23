@@ -346,6 +346,10 @@
                             ${processedDate}
                         </div>
                         <div class="meta-item">
+                            <strong>Mode</strong>
+                            ${thought.processing_mode === 'group' ? '👥 Group' : '💭 Personal'}
+                        </div>
+                        <div class="meta-item">
                             <strong>Thought ID</strong>
                             ${thought.id.substring(0, 16)}...
                         </div>
@@ -363,6 +367,41 @@
             }
             
             if (thought.status === 'completed') {
+                // Group Mode - Consolidated Output
+                if (thought.processing_mode === 'group' && thought.consolidated_output) {
+                    const consolidated = thought.consolidated_output;
+                    html += `
+                        <div class="section">
+                            <h2 class="section-title">👥 Group Perspectives - Consolidated Analysis</h2>
+                            
+                            ${consolidated.consensus_points && consolidated.consensus_points.length > 0 ? `
+                                <div class="info-box" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
+                                    <h4>✅ Consensus Points (Where Everyone Agrees)</h4>
+                                    <ul>
+                                        ${consolidated.consensus_points.map(point => `<li>${point}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            
+                            ${consolidated.divergent_views && consolidated.divergent_views.length > 0 ? `
+                                <div class="info-box" style="background: rgba(251, 146, 60, 0.1); border-left: 4px solid #fb923c;">
+                                    <h4>⚖️ Divergent Views (Different Perspectives)</h4>
+                                    <ul>
+                                        ${consolidated.divergent_views.map(view => `<li>${view}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            
+                            ${consolidated.balanced_recommendation ? `
+                                <div class="info-box" style="background: rgba(99, 102, 241, 0.1); border-left: 4px solid #6366f1;">
+                                    <h4>🎯 Balanced Recommendation</h4>
+                                    <p>${consolidated.balanced_recommendation}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
                 // Priority
                 if (thought.priority) {
                     const priorityLevel = thought.priority.priority_level || 'unknown';
