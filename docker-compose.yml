@@ -196,6 +196,165 @@ services:
     profiles:
       - tools  # Only start with: docker-compose --profile tools up
 
+  # Monitoring Stack
+  # Prometheus - Metrics collection and storage
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: thoughtprocessor-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: thoughtprocessor-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Loki - Log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: thoughtprocessor-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Promtail - Log shipper for Loki
+  promtail:
+    image: grafana/promtail:latest
+    container_name: thoughtprocessor-promtail
+    volumes:
+      - ./config/promtail-config.yml:/etc/promtail/config.yml
+      - api_logs:/var/log/api
+      - batch_logs:/var/log/batch
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Tempo - Distributed tracing
+  tempo:
+    image: grafana/tempo:latest
+    container_name: thoughtprocessor-tempo
+    ports:
+      - "3200:3200"   # tempo
+      - "4317:4317"   # otlp grpc
+      - "4318:4318"   # otlp http
+    volumes:
+      - ./config/tempo-config.yml:/etc/tempo.yaml
+      - tempo_data:/var/tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Node Exporter - System metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: thoughtprocessor-node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # PostgreSQL Exporter - Database metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: thoughtprocessor-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-thoughtprocessor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-thoughtprocessor}?sslmode=disable"
+    depends_on:
+      - db
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Redis Exporter - Redis metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: thoughtprocessor-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
+  # Kafka Exporter - Kafka metrics
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: thoughtprocessor-kafka-exporter
+    ports:
+      - "9308:9308"
+    command:
+      - '--kafka.server=kafka:9092'
+    depends_on:
+      - kafka
+    networks:
+      - thoughtprocessor-network
+    profiles:
+      - monitoring
+
 volumes:
   postgres_data:
     driver: local
@@ -206,6 +365,14 @@ volumes:
   api_logs:
     driver: local
   batch_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  tempo_data:
     driver: local
 
 networks:

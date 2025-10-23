@@ -12,6 +12,7 @@ from collections import defaultdict
 from uuid import UUID
 
 from loguru import logger
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -20,6 +21,37 @@ from agents import AgentPipeline
 from semantic_cache import SemanticCache
 from common.database import DatabaseFactory
 from common.database.base import DatabaseAdapter
+
+# Prometheus metrics
+THOUGHTS_PROCESSED = Counter(
+    'batch_processor_thoughts_processed_total',
+    'Total number of thoughts processed'
+)
+THOUGHTS_FAILED = Counter(
+    'batch_processor_thoughts_failed_total',
+    'Total number of thoughts that failed processing'
+)
+CACHE_HITS = Counter(
+    'batch_processor_cache_hits_total',
+    'Total number of cache hits'
+)
+CACHE_MISSES = Counter(
+    'batch_processor_cache_misses_total',
+    'Total number of cache misses'
+)
+PROCESSING_DURATION = Histogram(
+    'batch_processor_processing_duration_seconds',
+    'Time spent processing a thought',
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]
+)
+ACTIVE_WORKERS = Gauge(
+    'batch_processor_active_workers',
+    'Number of active workers'
+)
+QUEUE_SIZE = Gauge(
+    'batch_processor_queue_size',
+    'Number of thoughts in queue'
+)
 
 # Import Kafka and SSE if in Kafka mode
 if settings.kafka_mode or settings.kafka_enabled:
@@ -195,94 +227,100 @@ class ThoughtProcessor:
         group_id = thought.get("group_id")
         start_time = datetime.utcnow()
 
-        # Parse user_context (might be JSON string or dict)
-        user_context = thought["context"]
-        if isinstance(user_context, str):
-            try:
-                user_context = json.loads(user_context)
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse user_context as JSON, using empty dict")
+        # Start timing for Prometheus
+        with PROCESSING_DURATION.time():
+            # Parse user_context (might be JSON string or dict)
+            user_context = thought["context"]
+            if isinstance(user_context, str):
+                try:
+                    user_context = json.loads(user_context)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse user_context as JSON, using empty dict")
+                    user_context = {}
+            elif user_context is None:
                 user_context = {}
-        elif user_context is None:
-            user_context = {}
 
-        try:
-            # Mark as processing
-            await self.mark_processing(thought_id, thought.get('processing_attempts', 0))
+            try:
+                # Mark as processing
+                await self.mark_processing(thought_id, thought.get('processing_attempts', 0))
 
-            # SSE Update: Processing started
-            if publish_updates:
-                await self._publish_sse_update(
-                    user_id,
-                    "thought_processing",
-                    {
-                        "thought_id": thought_id,
-                        "status": "processing",
-                        "mode": processing_mode,
-                        "message": "Starting AI analysis..."
-                    }
-                )
+                # SSE Update: Processing started
+                if publish_updates:
+                    await self._publish_sse_update(
+                        user_id,
+                        "thought_processing",
+                        {
+                            "thought_id": thought_id,
+                            "status": "processing",
+                            "mode": processing_mode,
+                            "message": "Starting AI analysis..."
+                        }
+                    )
 
-            # Route to appropriate processing method based on mode
-            if processing_mode == "group" and group_id:
-                result = await self._process_group_mode(
-                    thought_id,
-                    thought_text,
-                    user_id,
-                    user_context,
-                    group_id,
-                    publish_updates
-                )
-            else:
-                # Default single mode processing
-                result = await self._process_single_mode(
-                    thought_id,
-                    thought_text,
-                    user_id,
-                    user_context,
-                    publish_updates
-                )
+                # Route to appropriate processing method based on mode
+                if processing_mode == "group" and group_id:
+                    result = await self._process_group_mode(
+                        thought_id,
+                        thought_text,
+                        user_id,
+                        user_context,
+                        group_id,
+                        publish_updates
+                    )
+                else:
+                    # Default single mode processing
+                    result = await self._process_single_mode(
+                        thought_id,
+                        thought_text,
+                        user_id,
+                        user_context,
+                        publish_updates
+                    )
 
-            # Get embedding for the thought (for semantic search later)
-            embedding = await self.semantic_cache.get_embedding(thought_text)
+                # Get embedding for the thought (for semantic search later)
+                embedding = await self.semantic_cache.get_embedding(thought_text)
 
-            # Save results to database (mode-specific)
-            await self.save_results(thought_id, result, embedding)
+                # Save results to database (mode-specific)
+                await self.save_results(thought_id, result, embedding)
 
-            # Calculate processing time
-            processing_time = (datetime.utcnow() - start_time).total_seconds()
+                # Calculate processing time
+                processing_time = (datetime.utcnow() - start_time).total_seconds()
 
-            # SSE Update: Completed
-            if publish_updates:
-                await self._publish_sse_update(
-                    user_id,
-                    "thought_completed",
-                    {
-                        "thought_id": thought_id,
-                        "status": "completed",
-                        "mode": processing_mode,
-                        "message": "Analysis complete!",
-                        "processing_time_seconds": processing_time
-                    }
-                )
+                # SSE Update: Completed
+                if publish_updates:
+                    await self._publish_sse_update(
+                        user_id,
+                        "thought_completed",
+                        {
+                            "thought_id": thought_id,
+                            "status": "completed",
+                            "mode": processing_mode,
+                            "message": "Analysis complete!",
+                            "processing_time_seconds": processing_time
+                        }
+                    )
 
-            self.stats["processed"] += 1
-            return True
+                # Update Prometheus metrics
+                THOUGHTS_PROCESSED.inc()
+                self.stats["processed"] += 1
+                return True
 
-        except Exception as e:
-            logger.error(f"Failed to process thought {thought_id}: {e}")
-            await self.mark_failed(thought_id, str(e))
+            except Exception as e:
+                logger.error(f"Failed to process thought {thought_id}: {e}")
+                await self.mark_failed(thought_id, str(e))
 
-            # SSE Update: Failed
-            if publish_updates:
-                await self._publish_sse_update(
-                    user_id,
-                    "thought_failed",
-                    {"thought_id": thought_id, "status": "failed", "error": str(e)}
-                )
+                # SSE Update: Failed
+                if publish_updates:
+                    await self._publish_sse_update(
+                        user_id,
+                        "thought_failed",
+                        {"thought_id": thought_id, "status": "failed", "error": str(e)}
+                    )
 
-            self.stats["failed"] += 1
-            return False
+                # Update Prometheus metrics
+                THOUGHTS_FAILED.inc()
+                self.stats["failed"] += 1
+                return False
 
     async def _process_single_mode(
         self,
@@ -305,6 +343,7 @@ class ThoughtProcessor:
         if cached_result:
             # Cache hit - use cached result
             result = cached_result
+            CACHE_HITS.inc()
             self.stats["cache_hits"] += 1
             logger.info(f"Using cached result for thought {thought_id}")
 
@@ -327,6 +366,7 @@ class ThoughtProcessor:
 
         else:
             # Cache miss - process with AI
+            CACHE_MISSES.inc()
             self.stats["cache_misses"] += 1
             logger.info(f"Processing thought {thought_id} with AI pipeline")
 
@@ -858,11 +898,19 @@ async def main():
     """
     Entry point - detects mode (Kafka vs Batch) and runs accordingly
     """
+    # Start Prometheus metrics server on port 8001
+    try:
+        start_http_server(8001)
+        logger.info("Prometheus metrics server started on port 8001")
+    except Exception as e:
+        logger.warning(f"Failed to start metrics server: {e}")
+
     # Determine mode
     kafka_mode_enabled = settings.kafka_mode or settings.kafka_enabled
 
     if kafka_mode_enabled and KAFKA_AVAILABLE:
         logger.info("🚀 Starting in KAFKA STREAMING mode")
+        ACTIVE_WORKERS.set(1)
 
         # Initialize database
         db = await DatabaseFactory.create_from_env(use_supabase=False)

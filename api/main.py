@@ -17,6 +17,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from loguru import logger
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from models import (
     ThoughtInput,
@@ -108,6 +109,19 @@ app = FastAPI(
 # Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Initialize Prometheus metrics instrumentation
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=[".*admin.*", "/metrics"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="http_requests_inprogress",
+    inprogress_labels=True
+)
+instrumentator.instrument(app).expose(app, endpoint="/metrics")
 
 # Configure CORS
 app.add_middleware(

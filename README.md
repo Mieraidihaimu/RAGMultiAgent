@@ -220,6 +220,31 @@ Test coverage:
 
 See [tests/README.md](tests/README.md) for details.
 
+## Monitoring & Observability
+
+Monitor your system with Grafana, Prometheus, Loki, and Tempo:
+
+```bash
+# Start with monitoring stack
+./start_monitoring.sh
+
+# Or manually
+docker-compose --profile monitoring up -d
+```
+
+**Access Dashboards**:
+- **Grafana**: http://localhost:3001 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **API Metrics**: http://localhost:8000/metrics
+- **Worker Metrics**: http://localhost:8001/metrics
+
+**Pre-configured Dashboards**:
+- API Metrics: Request rates, latency, errors
+- Kafka & Batch Processing: Consumer lag, throughput, cache hit rate
+- Database & Cache: PostgreSQL and Redis health
+
+See [MONITORING.md](MONITORING.md) for complete guide.
+
 ## Common Commands
 
 ```bash
@@ -244,6 +269,7 @@ docker compose exec db psql -U thoughtprocessor
 ## Documentation
 
 - [QUICK_START.md](QUICK_START.md) - Detailed getting started guide
+- [MONITORING.md](MONITORING.md) - Complete monitoring & observability guide
 - [tests/README.md](tests/README.md) - Integration test documentation
 - [SAAS_SETUP.md](SAAS_SETUP.md) - Payment & subscription setup
 
@@ -256,6 +282,7 @@ docker compose exec db psql -U thoughtprocessor
 - **Frontend**: HTML/JS, nginx
 - **Payments**: Stripe
 - **AI**: Google Gemini / Anthropic Claude / OpenAI GPT
+- **Monitoring**: Prometheus, Grafana, Loki, Tempo
 - **Infrastructure**: Docker Compose
 
 ---

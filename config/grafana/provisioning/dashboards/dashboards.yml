@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning
+# This file tells Grafana where to find dashboard JSON files
+
+apiVersion: 1
+
+providers:
+  - name: 'Thought Processor Dashboards'
+    orgId: 1
+    folder: 'Thought Processor'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
