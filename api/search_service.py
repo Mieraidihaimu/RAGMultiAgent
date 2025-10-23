@@ -132,23 +132,32 @@ class ThoughtSearchService:
         """
         Format a thought record into a searchable document.
         """
-        searchable_text = self._extract_searchable_text(thought)
-        
-        return {
-            "id": f"thought_{thought['id']}",
-            "title": thought.get("text", "")[:100],  # First 100 chars as title
-            "content": searchable_text,
-            "category": self._get_category(thought),
-            "tags": self._extract_tags(thought),
-            "user_id": str(thought.get("user_id", "")),
-            "status": thought.get("status", ""),
-            "created_at": str(thought.get("created_at", "")),
-            "metadata": {
-                "thought_id": str(thought["id"]),
-                "processing_mode": thought.get("processing_mode", "single"),
-                "group_id": str(thought.get("group_id", "")) if thought.get("group_id") else None
+        try:
+            searchable_text = self._extract_searchable_text(thought)
+            
+            # Ensure thought has required fields
+            thought_id = thought.get('id')
+            if not thought_id:
+                raise ValueError("Thought missing 'id' field")
+            
+            return {
+                "id": f"thought_{thought_id}",
+                "title": str(thought.get("text", ""))[:100],  # First 100 chars as title
+                "content": searchable_text,
+                "category": self._get_category(thought),
+                "tags": self._extract_tags(thought),
+                "user_id": str(thought.get("user_id", "")),
+                "status": str(thought.get("status", "")),
+                "created_at": str(thought.get("created_at", "")),
+                "metadata": {
+                    "thought_id": str(thought_id),
+                    "processing_mode": str(thought.get("processing_mode", "single")),
+                    "group_id": str(thought.get("group_id", "")) if thought.get("group_id") else None
+                }
             }
-        }
+        except Exception as e:
+            print(f"Error in _format_thought_document for thought {thought.get('id', 'unknown')}: {e}")
+            raise
     
     def _get_category(self, thought: Dict[str, Any]) -> str:
         """Extract category from thought classification"""
@@ -203,11 +212,30 @@ class ThoughtSearchService:
             await self.initialize()
         
         try:
-            documents = [self._format_thought_document(t) for t in thoughts]
+            documents = []
+            failed_thoughts = []
+            
+            for thought in thoughts:
+                try:
+                    doc = self._format_thought_document(thought)
+                    documents.append(doc)
+                except Exception as e:
+                    print(f"Error formatting thought {thought.get('id')}: {e}")
+                    failed_thoughts.append(thought.get('id'))
+            
+            if not documents:
+                return {"indexed": 0, "error": "No valid documents to index"}
+            
             result = self.hybrid_engine.index_documents(documents)
+            
+            if failed_thoughts:
+                print(f"Failed to format {len(failed_thoughts)} thoughts: {failed_thoughts}")
+            
             return result
         except Exception as e:
             print(f"Error batch indexing thoughts: {e}")
+            import traceback
+            traceback.print_exc()
             return {"indexed": 0, "error": str(e)}
     
     async def search_thoughts(
