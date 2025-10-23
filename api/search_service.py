@@ -188,7 +188,7 @@ class ThoughtSearchService:
         
         try:
             document = self._format_thought_document(thought)
-            await self.hybrid_engine.index_documents([document])
+            self.hybrid_engine.index_documents([document])
             return True
         except Exception as e:
             print(f"Error indexing thought {thought.get('id')}: {e}")
@@ -204,7 +204,7 @@ class ThoughtSearchService:
         
         try:
             documents = [self._format_thought_document(t) for t in thoughts]
-            result = await self.hybrid_engine.index_documents(documents)
+            result = self.hybrid_engine.index_documents(documents)
             return result
         except Exception as e:
             print(f"Error batch indexing thoughts: {e}")
@@ -248,11 +248,11 @@ class ThoughtSearchService:
         try:
             # Execute search based on mode
             if search_mode == "keyword":
-                results = await self.es_engine.search(query, top_k=top_k, filters=filters)
+                results = self.es_engine.search(query, top_k=top_k, filters=filters)
             elif search_mode == "semantic":
-                results = await self.semantic_engine.search(query, top_k=top_k, filters=filters)
+                results = self.semantic_engine.search(query, top_k=top_k, filters=filters)
             else:  # hybrid (default)
-                results = await self.hybrid_engine.search(query, top_k=top_k, filters=filters)
+                results = self.hybrid_engine.search(query, top_k=top_k, filters=filters)
             
             # Enhance results with thought metadata
             enhanced_results = []
@@ -299,9 +299,9 @@ class ThoughtSearchService:
             filters["user_id"] = user_id
         
         try:
-            keyword_results = await self.es_engine.search(query, top_k=top_k, filters=filters)
-            semantic_results = await self.semantic_engine.search(query, top_k=top_k, filters=filters)
-            hybrid_results = await self.hybrid_engine.search(query, top_k=top_k, filters=filters)
+            keyword_results = self.es_engine.search(query, top_k=top_k, filters=filters)
+            semantic_results = self.semantic_engine.search(query, top_k=top_k, filters=filters)
+            hybrid_results = self.hybrid_engine.search(query, top_k=top_k, filters=filters)
             
             return {
                 "query": query,
