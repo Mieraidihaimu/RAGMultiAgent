@@ -50,6 +50,10 @@ services:
       KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
       REDIS_URL: redis://redis:6379
 
+      # Search (Elasticsearch)
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
@@ -63,6 +67,7 @@ services:
       - ./api:/app
       - ./common:/app/common
       - ./kafka:/app/kafka
+      - ./search_comparison:/app/search_comparison
       - api_logs:/app/logs
     networks:
       - thoughtprocessor-network

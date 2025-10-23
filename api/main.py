@@ -87,6 +87,15 @@ except ImportError:
     PAYMENT_ROUTES_AVAILABLE = False
     logger.warning("Payment routes not available - stripe package may not be installed")
 
+# Import search routes
+try:
+    from search_routes import router as search_router
+    from search_service import get_search_service, close_search_service
+    SEARCH_AVAILABLE = True
+except ImportError as e:
+    SEARCH_AVAILABLE = False
+    logger.warning(f"Search routes not available: {e}")
+
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
@@ -146,6 +155,11 @@ if PAYMENT_ROUTES_AVAILABLE:
     app.include_router(payment_router)
     logger.info("Payment routes enabled")
 
+# Include search routes if available
+if SEARCH_AVAILABLE:
+    app.include_router(search_router)
+    logger.info("Search routes enabled")
+
 
 # Lifecycle events for Kafka/Redis
 @app.on_event("startup")
@@ -164,6 +178,15 @@ async def startup_event():
         except Exception as e:
             logger.error(f"Failed to initialize Kafka/Redis: {e}")
             logger.warning("Continuing without Kafka/SSE support")
+    
+    # Initialize search service if available
+    if SEARCH_AVAILABLE:
+        try:
+            await get_search_service()
+            logger.info("Search service initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize search service: {e}")
+            logger.warning("Continuing without search support")
 
 
 @app.on_event("shutdown")
@@ -178,6 +201,14 @@ async def shutdown_event():
             logger.info("SSE manager closed")
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
+    
+    # Close search service if available
+    if SEARCH_AVAILABLE:
+        try:
+            await close_search_service()
+            logger.info("Search service closed")
+        except Exception as e:
+            logger.error(f"Error closing search service: {e}")
 
 
 @app.get("/", tags=["Health"])
