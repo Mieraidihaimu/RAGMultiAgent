@@ -148,16 +148,22 @@ class KafkaThoughtProducer:
         user_id: str,
         thought_id: str,
         text: str,
-        user_context: Optional[dict] = None
+        user_context: Optional[dict] = None,
+        processing_mode: str = "single",
+        group_id: Optional[str] = None,
+        anonymous_session: Optional[str] = None
     ) -> bool:
         """
         Convenience method to send a ThoughtCreatedEvent
 
         Args:
-            user_id: User ID
+            user_id: User ID (can be None for anonymous)
             thought_id: Thought ID
             text: Thought text
             user_context: Optional user context
+            processing_mode: 'single' or 'group'
+            group_id: Persona group ID (for group mode)
+            anonymous_session: Anonymous session token (if applicable)
 
         Returns:
             True if successful, False otherwise
@@ -165,10 +171,12 @@ class KafkaThoughtProducer:
         from kafka.events import ThoughtCreatedEvent
 
         event = ThoughtCreatedEvent(
-            user_id=user_id,
+            user_id=user_id or "anonymous",
             thought_id=thought_id,
             text=text,
-            user_context=user_context or {}
+            user_context=user_context or {},
+            processing_mode=processing_mode,
+            group_id=group_id
         )
 
         return await self.send_event(event)

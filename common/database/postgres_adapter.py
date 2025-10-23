@@ -174,7 +174,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
         """
         import json
 
-        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context', 'response'}
+        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context', 'response', 'consolidated_output'}
 
         for field in json_fields:
             if field in row and row[field] is not None and isinstance(row[field], str):
@@ -223,6 +223,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
         self,
         user_id: str,
         text: str,
+        processing_mode: str = 'single',
+        group_id: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -231,22 +233,27 @@ class PostgreSQLAdapter(DatabaseAdapter):
         Args:
             user_id: User ID
             text: Thought text (will be encrypted if encryption enabled)
-            **kwargs: Additional fields
+            processing_mode: 'single' or 'group'
+            group_id: Persona group ID (required if processing_mode='group')
+            **kwargs: Additional fields (e.g., anonymous_session_id)
 
         Returns:
             Created thought record (with text decrypted)
         """
         # Encrypt the thought text before storing
         encrypted_text = self._encrypt_field('text', text)
+        
+        # Extract anonymous_session_id if present
+        anonymous_session_id = kwargs.get('anonymous_session_id')
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO thoughts (user_id, text, status, created_at)
-                VALUES ($1, $2, 'pending', NOW())
-                RETURNING id, user_id, text, status, created_at
+                INSERT INTO thoughts (user_id, text, status, processing_mode, group_id, anonymous_session_id, created_at)
+                VALUES ($1, $2, 'pending', $3, $4, $5, NOW())
+                RETURNING id, user_id, text, status, processing_mode, group_id, created_at
                 """,
-                user_id, encrypted_text
+                user_id, encrypted_text, processing_mode, group_id, anonymous_session_id
             )
             result = dict(row)
 
@@ -379,7 +386,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
         import json
 
         # JSON fields that need serialization (for non-encrypted fields)
-        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context'}
+        json_fields = {'classification', 'analysis', 'value_impact', 'action_plan', 'priority', 'context', 'consolidated_output'}
 
         # Build dynamic UPDATE query
         set_clauses = []
@@ -653,5 +660,303 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 LIMIT $2
                 """,
                 user_id, limit
+            )
+            return [dict(row) for row in rows]
+
+    # ========================================================================
+    # Persona Group Methods
+    # ========================================================================
+
+    async def create_persona_group(
+        self,
+        user_id: str,
+        name: str,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new persona group"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO persona_groups (user_id, name, description)
+                VALUES ($1, $2, $3)
+                RETURNING id, user_id, name, description, created_at, updated_at
+                """,
+                user_id, name, description
+            )
+            return dict(row)
+
+    async def get_persona_group(
+        self,
+        group_id: str,
+        include_personas: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """Get a persona group by ID"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, user_id, name, description, created_at, updated_at
+                FROM persona_groups
+                WHERE id = $1
+                """,
+                group_id
+            )
+            
+            if not row:
+                return None
+            
+            group = dict(row)
+            
+            if include_personas:
+                personas = await conn.fetch(
+                    """
+                    SELECT id, group_id, name, prompt, sort_order, created_at, updated_at
+                    FROM personas
+                    WHERE group_id = $1
+                    ORDER BY sort_order ASC, created_at ASC
+                    """,
+                    group_id
+                )
+                group['personas'] = [dict(p) for p in personas]
+            else:
+                group['personas'] = []
+            
+            return group
+
+    async def get_persona_groups(
+        self,
+        user_id: str,
+        include_personas: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Get all persona groups for a user"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, user_id, name, description, created_at, updated_at
+                FROM persona_groups
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                """,
+                user_id
+            )
+            
+            groups = [dict(row) for row in rows]
+            
+            if include_personas and groups:
+                # Fetch all personas for these groups in one query
+                group_ids = [g['id'] for g in groups]
+                personas = await conn.fetch(
+                    """
+                    SELECT id, group_id, name, prompt, sort_order, created_at, updated_at
+                    FROM personas
+                    WHERE group_id = ANY($1)
+                    ORDER BY sort_order ASC, created_at ASC
+                    """,
+                    group_ids
+                )
+                
+                # Group personas by group_id
+                personas_by_group = {}
+                for p in personas:
+                    persona_dict = dict(p)
+                    group_id = persona_dict['group_id']
+                    if group_id not in personas_by_group:
+                        personas_by_group[group_id] = []
+                    personas_by_group[group_id].append(persona_dict)
+                
+                # Attach personas to groups
+                for group in groups:
+                    group['personas'] = personas_by_group.get(group['id'], [])
+            else:
+                for group in groups:
+                    group['personas'] = []
+            
+            return groups
+
+    async def update_persona_group(
+        self,
+        group_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Update a persona group"""
+        updates = []
+        values = []
+        param_idx = 1
+        
+        if name is not None:
+            updates.append(f"name = ${param_idx}")
+            values.append(name)
+            param_idx += 1
+        
+        if description is not None:
+            updates.append(f"description = ${param_idx}")
+            values.append(description)
+            param_idx += 1
+        
+        if not updates:
+            return await self.get_persona_group(group_id, include_personas=False)
+        
+        values.append(group_id)
+        
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                UPDATE persona_groups
+                SET {', '.join(updates)}
+                WHERE id = ${param_idx}
+                RETURNING id, user_id, name, description, created_at, updated_at
+                """,
+                *values
+            )
+            
+            if not row:
+                return None
+            
+            return dict(row)
+
+    async def delete_persona_group(self, group_id: str) -> bool:
+        """Delete a persona group (cascades to personas and thought_persona_runs)"""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM persona_groups WHERE id = $1",
+                group_id
+            )
+            return result == "DELETE 1"
+
+    # ========================================================================
+    # Persona Methods
+    # ========================================================================
+
+    async def create_persona(
+        self,
+        group_id: str,
+        name: str,
+        prompt: str,
+        sort_order: int = 0
+    ) -> Dict[str, Any]:
+        """Create a new persona"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO personas (group_id, name, prompt, sort_order)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id, group_id, name, prompt, sort_order, created_at, updated_at
+                """,
+                group_id, name, prompt, sort_order
+            )
+            return dict(row)
+
+    async def get_persona(self, persona_id: str) -> Optional[Dict[str, Any]]:
+        """Get a persona by ID"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, group_id, name, prompt, sort_order, created_at, updated_at
+                FROM personas
+                WHERE id = $1
+                """,
+                persona_id
+            )
+            return dict(row) if row else None
+
+    async def update_persona(
+        self,
+        persona_id: str,
+        name: Optional[str] = None,
+        prompt: Optional[str] = None,
+        sort_order: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Update a persona"""
+        updates = []
+        values = []
+        param_idx = 1
+        
+        if name is not None:
+            updates.append(f"name = ${param_idx}")
+            values.append(name)
+            param_idx += 1
+        
+        if prompt is not None:
+            updates.append(f"prompt = ${param_idx}")
+            values.append(prompt)
+            param_idx += 1
+        
+        if sort_order is not None:
+            updates.append(f"sort_order = ${param_idx}")
+            values.append(sort_order)
+            param_idx += 1
+        
+        if not updates:
+            return await self.get_persona(persona_id)
+        
+        values.append(persona_id)
+        
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                UPDATE personas
+                SET {', '.join(updates)}
+                WHERE id = ${param_idx}
+                RETURNING id, group_id, name, prompt, sort_order, created_at, updated_at
+                """,
+                *values
+            )
+            
+            if not row:
+                return None
+            
+            return dict(row)
+
+    async def delete_persona(self, persona_id: str) -> bool:
+        """Delete a persona"""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM personas WHERE id = $1",
+                persona_id
+            )
+            return result == "DELETE 1"
+
+    # ========================================================================
+    # Thought Persona Run Methods
+    # ========================================================================
+
+    async def create_thought_persona_run(
+        self,
+        thought_id: str,
+        persona_id: Optional[str],
+        group_id: Optional[str],
+        persona_name: str,
+        persona_output: Dict[str, Any],
+        processing_time_ms: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Record a persona's processing of a thought"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO thought_persona_runs 
+                (thought_id, persona_id, group_id, persona_name, persona_output, processing_time_ms)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, thought_id, persona_id, group_id, persona_name, 
+                          persona_output, processing_time_ms, created_at
+                """,
+                thought_id, persona_id, group_id, persona_name, persona_output, processing_time_ms
+            )
+            return dict(row)
+
+    async def get_thought_persona_runs(
+        self,
+        thought_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get all persona runs for a thought"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, thought_id, persona_id, group_id, persona_name,
+                       persona_output, processing_time_ms, created_at
+                FROM thought_persona_runs
+                WHERE thought_id = $1
+                ORDER BY created_at ASC
+                """,
+                thought_id
             )
             return [dict(row) for row in rows]

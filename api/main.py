@@ -29,7 +29,12 @@ from models import (
     HealthResponse,
     ErrorResponse,
     AnonymousThoughtInput,
-    AnonymousSessionResponse
+    AnonymousSessionResponse,
+    PersonaInput,
+    PersonaResponse,
+    PersonaGroupInput,
+    PersonaGroupResponse,
+    PersonaGroupListResponse
 )
 from database import get_db
 from common.database.base import DatabaseAdapter
@@ -440,6 +445,12 @@ async def create_thought(
     """
     Create a new thought for processing
 
+    Supports two processing modes:
+    - 'single' (default): Personal LLM feedback using the 5-agent pipeline
+    - 'group': Multiple persona perspectives with AI-powered consolidation
+    
+    For group mode, group_id must be provided and must belong to the user.
+
     With Kafka enabled: Published to Kafka topic for real-time processing
     Without Kafka: Saved with 'pending' status for batch processing
 
@@ -462,10 +473,52 @@ async def create_thought(
                 detail=f"User {thought.user_id} not found"
             )
 
+        # Validate group mode requirements
+        processing_mode = thought.processing_mode or "single"
+        group_id = thought.group_id
+        
+        if processing_mode not in ["single", "group"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid processing_mode. Must be 'single' or 'group'"
+            )
+        
+        if processing_mode == "group":
+            if not group_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="group_id is required when processing_mode is 'group'"
+                )
+            
+            # Verify group exists and belongs to user
+            group = await db.get_persona_group(str(group_id), include_personas=True)
+            if not group:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Persona group {group_id} not found"
+                )
+            
+            if str(group['user_id']) != str(thought.user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot use other users' persona groups"
+                )
+            
+            # Check if group has personas
+            if not group.get('personas'):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Persona group must have at least one persona"
+                )
+            
+            logger.info(f"Creating group thought with {len(group['personas'])} personas from group '{group['name']}'")
+
         # Insert thought into database
         thought_data = await db.create_thought(
             user_id=str(thought.user_id),
             text=thought.text,
+            processing_mode=processing_mode,
+            group_id=str(group_id) if group_id else None
         )
 
         if not thought_data:
@@ -474,7 +527,7 @@ async def create_thought(
                 detail="Failed to create thought"
             )
 
-        logger.info(f"Created thought {thought_data['id']} for user {thought.user_id}")
+        logger.info(f"Created thought {thought_data['id']} for user {thought.user_id} (mode: {processing_mode})")
 
         # If Kafka is enabled, publish event for real-time processing
         if KAFKA_ENABLED and KAFKA_AVAILABLE:
@@ -496,7 +549,9 @@ async def create_thought(
                     user_id=str(thought.user_id),
                     thought_id=str(thought_data["id"]),
                     text=thought.text,
-                    user_context=user_context
+                    user_context=user_context,
+                    processing_mode=processing_mode,
+                    group_id=str(group_id) if group_id else None
                 )
 
                 if success:
@@ -506,7 +561,11 @@ async def create_thought(
                         thought_id=str(thought_data["id"])
                     )
 
-                    message = "Thought saved! Processing started..."
+                    if processing_mode == "group":
+                        message = f"Thought saved! Processing with {len(group['personas'])} personas..."
+                    else:
+                        message = "Thought saved! Processing started..."
+                    
                     logger.info(f"Published thought {thought_data['id']} to Kafka")
                 else:
                     message = "Thought saved! Will be processed soon."
@@ -925,6 +984,320 @@ async def stream_events(
             status_code=500,
             detail=f"Failed to establish SSE connection: {str(e)}"
         )
+
+
+# ============================================================================
+# Persona Group Endpoints
+# ============================================================================
+
+@app.post(
+    "/groups",
+    response_model=PersonaGroupResponse,
+    tags=["Persona Groups"],
+    status_code=201
+)
+@limiter.limit("20/minute")
+async def create_persona_group(
+    request: Request,
+    group_input: PersonaGroupInput,
+    user_id: UUID = Query(..., description="User ID"),
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Create a new persona group
+    
+    Limits: 10 groups per user
+    """
+    try:
+        # Check existing group count
+        existing_groups = await db.get_persona_groups(str(user_id), include_personas=False)
+        if len(existing_groups) >= 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 10 persona groups allowed per user"
+            )
+        
+        # Create group
+        group = await db.create_persona_group(
+            user_id=str(user_id),
+            name=group_input.name,
+            description=group_input.description
+        )
+        
+        # Add empty personas list
+        group['personas'] = []
+        
+        logger.info(f"Created persona group {group['id']} for user {user_id}")
+        return PersonaGroupResponse(**group)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating persona group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/groups",
+    response_model=PersonaGroupListResponse,
+    tags=["Persona Groups"]
+)
+@limiter.limit("60/minute")
+async def list_persona_groups(
+    request: Request,
+    user_id: UUID = Query(..., description="User ID"),
+    include_personas: bool = Query(True, description="Include personas in response"),
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Get all persona groups for a user"""
+    try:
+        groups = await db.get_persona_groups(str(user_id), include_personas=include_personas)
+        
+        return PersonaGroupListResponse(
+            groups=[PersonaGroupResponse(**g) for g in groups],
+            count=len(groups)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error listing persona groups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/groups/{group_id}",
+    response_model=PersonaGroupResponse,
+    tags=["Persona Groups"]
+)
+@limiter.limit("60/minute")
+async def get_persona_group(
+    request: Request,
+    group_id: UUID,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Get a specific persona group with its personas"""
+    try:
+        group = await db.get_persona_group(str(group_id), include_personas=True)
+        
+        if not group:
+            raise HTTPException(status_code=404, detail="Persona group not found")
+        
+        return PersonaGroupResponse(**group)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting persona group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put(
+    "/groups/{group_id}",
+    response_model=PersonaGroupResponse,
+    tags=["Persona Groups"]
+)
+@limiter.limit("30/minute")
+async def update_persona_group(
+    request: Request,
+    group_id: UUID,
+    group_input: PersonaGroupInput,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Update a persona group's name or description"""
+    try:
+        updated_group = await db.update_persona_group(
+            group_id=str(group_id),
+            name=group_input.name,
+            description=group_input.description
+        )
+        
+        if not updated_group:
+            raise HTTPException(status_code=404, detail="Persona group not found")
+        
+        # Fetch with personas
+        group = await db.get_persona_group(str(group_id), include_personas=True)
+        
+        logger.info(f"Updated persona group {group_id}")
+        return PersonaGroupResponse(**group)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating persona group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete(
+    "/groups/{group_id}",
+    tags=["Persona Groups"],
+    status_code=204
+)
+@limiter.limit("20/minute")
+async def delete_persona_group(
+    request: Request,
+    group_id: UUID,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Delete a persona group
+    
+    Note: This will cascade delete all personas in the group
+    """
+    try:
+        success = await db.delete_persona_group(str(group_id))
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Persona group not found")
+        
+        logger.info(f"Deleted persona group {group_id}")
+        return None
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting persona group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Persona Endpoints
+# ============================================================================
+
+@app.post(
+    "/groups/{group_id}/personas",
+    response_model=PersonaResponse,
+    tags=["Personas"],
+    status_code=201
+)
+@limiter.limit("20/minute")
+async def create_persona(
+    request: Request,
+    group_id: UUID,
+    persona_input: PersonaInput,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """
+    Create a new persona in a group
+    
+    Limits: 10 personas per group
+    """
+    try:
+        # Check if group exists and get persona count
+        group = await db.get_persona_group(str(group_id), include_personas=True)
+        
+        if not group:
+            raise HTTPException(status_code=404, detail="Persona group not found")
+        
+        if len(group.get('personas', [])) >= 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 10 personas allowed per group"
+            )
+        
+        # Create persona
+        persona = await db.create_persona(
+            group_id=str(group_id),
+            name=persona_input.name,
+            prompt=persona_input.prompt,
+            sort_order=persona_input.sort_order or 0
+        )
+        
+        logger.info(f"Created persona {persona['id']} in group {group_id}")
+        return PersonaResponse(**persona)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating persona: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/personas/{persona_id}",
+    response_model=PersonaResponse,
+    tags=["Personas"]
+)
+@limiter.limit("60/minute")
+async def get_persona(
+    request: Request,
+    persona_id: UUID,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Get a specific persona"""
+    try:
+        persona = await db.get_persona(str(persona_id))
+        
+        if not persona:
+            raise HTTPException(status_code=404, detail="Persona not found")
+        
+        return PersonaResponse(**persona)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting persona: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put(
+    "/personas/{persona_id}",
+    response_model=PersonaResponse,
+    tags=["Personas"]
+)
+@limiter.limit("30/minute")
+async def update_persona(
+    request: Request,
+    persona_id: UUID,
+    persona_input: PersonaInput,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Update a persona's name, prompt, or sort order"""
+    try:
+        updated_persona = await db.update_persona(
+            persona_id=str(persona_id),
+            name=persona_input.name,
+            prompt=persona_input.prompt,
+            sort_order=persona_input.sort_order
+        )
+        
+        if not updated_persona:
+            raise HTTPException(status_code=404, detail="Persona not found")
+        
+        logger.info(f"Updated persona {persona_id}")
+        return PersonaResponse(**updated_persona)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating persona: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete(
+    "/personas/{persona_id}",
+    tags=["Personas"],
+    status_code=204
+)
+@limiter.limit("20/minute")
+async def delete_persona(
+    request: Request,
+    persona_id: UUID,
+    db: DatabaseAdapter = Depends(get_db)
+):
+    """Delete a persona from its group"""
+    try:
+        success = await db.delete_persona(str(persona_id))
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Persona not found")
+        
+        logger.info(f"Deleted persona {persona_id}")
+        return None
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting persona: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.exception_handler(Exception)

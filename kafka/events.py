@@ -17,6 +17,10 @@ class EventType(str, Enum):
     THOUGHT_AGENT_COMPLETED = "thought_agent_completed"
     THOUGHT_COMPLETED = "thought_completed"
     THOUGHT_FAILED = "thought_failed"
+    # New events for group/persona processing
+    GROUP_PROCESSING_STARTED = "group_processing_started"
+    PERSONA_COMPLETED = "persona_completed"
+    CONSOLIDATION_STARTED = "consolidation_started"
 
 
 class ThoughtEvent(BaseModel):
@@ -48,6 +52,8 @@ class ThoughtCreatedEvent(ThoughtEvent):
     event_type: Literal[EventType.THOUGHT_CREATED] = EventType.THOUGHT_CREATED
     text: str
     user_context: Optional[Dict[str, Any]] = None
+    processing_mode: str = "single"  # 'single' or 'group'
+    group_id: Optional[str] = None
 
 
 class ThoughtProcessingEvent(ThoughtEvent):
@@ -82,6 +88,29 @@ class ThoughtFailedEvent(ThoughtEvent):
     retry_count: int = 0
 
 
+class GroupProcessingStartedEvent(ThoughtEvent):
+    """Event emitted when group processing starts"""
+    event_type: Literal[EventType.GROUP_PROCESSING_STARTED] = EventType.GROUP_PROCESSING_STARTED
+    group_id: str
+    group_name: str
+    persona_count: int
+
+
+class PersonaCompletedEvent(ThoughtEvent):
+    """Event emitted when a single persona completes processing"""
+    event_type: Literal[EventType.PERSONA_COMPLETED] = EventType.PERSONA_COMPLETED
+    persona_id: str
+    persona_name: str
+    progress: str  # e.g., "2/5"
+    has_error: bool = False
+
+
+class ConsolidationStartedEvent(ThoughtEvent):
+    """Event emitted when consolidation of persona outputs starts"""
+    event_type: Literal[EventType.CONSOLIDATION_STARTED] = EventType.CONSOLIDATION_STARTED
+    message: str = "Synthesizing perspectives..."
+
+
 # Event type mapping for deserialization
 EVENT_TYPE_MAP = {
     EventType.THOUGHT_CREATED: ThoughtCreatedEvent,
@@ -89,6 +118,9 @@ EVENT_TYPE_MAP = {
     EventType.THOUGHT_AGENT_COMPLETED: ThoughtAgentCompletedEvent,
     EventType.THOUGHT_COMPLETED: ThoughtCompletedEvent,
     EventType.THOUGHT_FAILED: ThoughtFailedEvent,
+    EventType.GROUP_PROCESSING_STARTED: GroupProcessingStartedEvent,
+    EventType.PERSONA_COMPLETED: PersonaCompletedEvent,
+    EventType.CONSOLIDATION_STARTED: ConsolidationStartedEvent,
 }
 
 

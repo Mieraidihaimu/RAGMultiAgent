@@ -415,3 +415,184 @@ RESPOND WITH ONLY JSON, NO MARKDOWN OR ADDITIONAL TEXT."""
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
+
+    async def process_thought_with_group(
+        self,
+        thought_text: str,
+        user_context: Dict[str, Any],
+        personas: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Process a thought through multiple personas in parallel
+
+        Args:
+            thought_text: The thought to analyze
+            user_context: Base user context (shared across all personas)
+            personas: List of persona dicts with 'id', 'name', 'prompt' fields
+
+        Returns:
+            Dict with:
+                - persona_outputs: List of individual persona results
+                - consolidated: AI-synthesized consolidated feedback
+        """
+        import asyncio
+        import time
+
+        try:
+            logger.info(f"Starting group processing with {len(personas)} personas")
+            
+            # Process all personas in parallel
+            tasks = []
+            persona_metadata = []
+            
+            for persona in personas:
+                # Create persona-specific context by injecting persona prompt
+                persona_context = {
+                    **user_context,
+                    "persona_role": persona['prompt'],
+                    "persona_name": persona['name']
+                }
+                
+                # Create task for this persona
+                task = self.process_thought(thought_text, persona_context)
+                tasks.append(task)
+                persona_metadata.append({
+                    'id': persona['id'],
+                    'name': persona['name'],
+                    'prompt': persona['prompt']
+                })
+            
+            # Execute all personas in parallel
+            start_time = time.time()
+            persona_results = await asyncio.gather(*tasks, return_exceptions=True)
+            parallel_time = time.time() - start_time
+            
+            logger.info(f"Parallel persona processing completed in {parallel_time:.2f}s")
+            
+            # Build persona outputs list (handling any errors)
+            persona_outputs = []
+            for idx, result in enumerate(persona_results):
+                persona_meta = persona_metadata[idx]
+                
+                if isinstance(result, Exception):
+                    logger.error(f"Persona {persona_meta['name']} failed: {result}")
+                    persona_outputs.append({
+                        'persona_id': persona_meta['id'],
+                        'persona_name': persona_meta['name'],
+                        'error': str(result),
+                        'output': None
+                    })
+                else:
+                    persona_outputs.append({
+                        'persona_id': persona_meta['id'],
+                        'persona_name': persona_meta['name'],
+                        'output': result,
+                        'error': None
+                    })
+            
+            # Consolidate outputs using AI
+            successful_outputs = [p for p in persona_outputs if p['error'] is None]
+            
+            if not successful_outputs:
+                raise ValueError("All personas failed to process the thought")
+            
+            consolidated = await self.consolidate_persona_outputs(
+                thought_text,
+                successful_outputs,
+                user_context
+            )
+            
+            return {
+                "mode": "group",
+                "persona_count": len(personas),
+                "persona_outputs": persona_outputs,
+                "consolidated": consolidated,
+                "processing_time_seconds": parallel_time
+            }
+
+        except Exception as e:
+            logger.error(f"Group processing failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
+
+    async def consolidate_persona_outputs(
+        self,
+        thought_text: str,
+        persona_outputs: List[Dict[str, Any]],
+        user_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Agent 6: Consolidation Agent
+        Synthesizes multiple persona perspectives into unified feedback
+
+        Args:
+            thought_text: Original thought
+            persona_outputs: List of successful persona outputs
+            user_context: User context for additional context
+
+        Returns:
+            Consolidated analysis with consensus, divergent views, and balanced recommendation
+        """
+        try:
+            logger.info(f"Consolidating {len(persona_outputs)} persona perspectives")
+            
+            # Format persona outputs for prompt
+            formatted_outputs = []
+            for p in persona_outputs:
+                formatted_outputs.append(f"""
+PERSONA: {p['persona_name']}
+PRIORITY: {p['output'].get('priority', {}).get('priority_level', 'N/A')}
+RECOMMENDATION: {p['output'].get('priority', {}).get('final_recommendation', 'N/A')}
+ACTION PLAN: {json.dumps(p['output'].get('action_plan', {}), indent=2)}
+VALUE ASSESSMENT: {json.dumps(p['output'].get('value_impact', {}), indent=2)}
+""")
+            
+            prompt = f"""You are a meta-analyst synthesizing multiple perspectives on a single thought.
+
+ORIGINAL THOUGHT: "{thought_text}"
+
+PERSONA FEEDBACK:
+{''.join(formatted_outputs)}
+
+Your task: Provide a balanced, synthesized analysis that:
+1. Identifies where personas AGREE (consensus points)
+2. Highlights where personas DISAGREE (divergent views with reasoning)
+3. Provides a BALANCED RECOMMENDATION that integrates all perspectives
+4. Attributes key insights to specific personas
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "consensus_points": [
+    "Clear statement of agreement across personas"
+  ],
+  "divergent_views": {{
+    "category_name": {{
+      "viewpoint_1": ["Persona Name - their view"],
+      "viewpoint_2": ["Persona Name - their view"]
+    }}
+  }},
+  "balanced_recommendation": {{
+    "action": "Clear next step that integrates perspectives",
+    "reasoning": "Why this balances all viewpoints",
+    "next_steps": [
+      "Specific actionable step with persona attribution"
+    ],
+    "timeline": "Recommended timeline considering all inputs"
+  }},
+  "personas_referenced": {{
+    "persona_name": "Key contribution from this persona"
+  }},
+  "overall_priority": "Critical/High/Medium/Low/Defer",
+  "synthesis_confidence": "high/medium/low"
+}}
+
+Be objective, fair, and ensure all persona perspectives are represented. RESPOND WITH ONLY JSON."""
+
+            result = await self._generate_json_response(prompt, user_context, max_tokens=2000)
+            logger.debug("Consolidation complete")
+            return result
+
+        except Exception as e:
+            logger.error(f"Consolidation failed: {e}")
+            raise
