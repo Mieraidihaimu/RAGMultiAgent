@@ -13,7 +13,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a24 50%, #0f0f18 100%);
+            background: #0a0a0f;
             min-height: 100vh;
             color: #e5e7eb;
             padding: 0;
@@ -29,8 +29,9 @@
             width: 100%;
             height: 100%;
             background: 
-                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 40%);
+                radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 0% 50%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+                radial-gradient(circle at 100% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
             pointer-events: none;
             z-index: 0;
         }
@@ -43,15 +44,15 @@
             padding: 0 20px;
         }
         
-        /* Compact Header with Stats */
+        /* Modern Compact Header */
         .header-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
-            background: rgba(17, 17, 27, 0.4);
-            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
-            backdrop-filter: blur(20px);
+            padding: 14px 24px;
+            background: rgba(17, 17, 27, 0.85);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+            backdrop-filter: blur(40px);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -59,41 +60,47 @@
         }
 
         .app-title {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
-            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #e5e7eb;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            letter-spacing: -0.02em;
+        }
+        
+        .app-title .icon {
+            font-size: 1.3rem;
+            filter: grayscale(0.2);
         }
 
         .header-stats {
-            display: flex;
-            gap: 20px;
+            display: none; /* Hidden for cleaner look, can be toggled */
+            gap: 16px;
             align-items: center;
         }
 
         .mini-stat {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
-            gap: 2px;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(99, 102, 241, 0.08);
+            border-radius: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.12);
         }
 
         .mini-stat-value {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 700;
             color: #818cf8;
         }
 
         .mini-stat-label {
-            font-size: 0.65rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.7rem;
+            color: #9ca3af;
+            letter-spacing: 0.3px;
         }
 
         .user-menu {
@@ -116,123 +123,145 @@
 
         .btn-manage-groups,
         .btn-search {
-            padding: 6px 14px;
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            border-radius: 6px;
-            color: #818cf8;
-            font-size: 0.75rem;
-            font-weight: 600;
+            padding: 8px 14px;
+            background: transparent;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            color: #9ca3af;
+            font-size: 0.8rem;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 7px;
         }
 
         .btn-manage-groups:hover,
         .btn-search:hover {
-            background: rgba(99, 102, 241, 0.2);
-            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #d1d5db;
         }
 
         .btn-logout {
-            padding: 6px 14px;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 6px;
-            color: #ef4444;
-            font-size: 0.75rem;
-            font-weight: 600;
+            padding: 8px 14px;
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            color: #f87171;
+            font-size: 0.8rem;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .btn-logout:hover {
-            background: rgba(239, 68, 68, 0.2);
-            border-color: rgba(239, 68, 68, 0.5);
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
         }
 
-        /* Main Input Area - Centered & Elevated */
+        /* Modern Input Area - Clean & Centered */
         .input-section {
-            margin-top: 80px;
-            margin-bottom: 60px;
+            margin-top: 100px;
+            margin-bottom: 80px;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .welcome-prompt {
+            text-align: center;
+            margin-bottom: 32px;
+            animation: fadeIn 0.6s ease;
+        }
+        
+        .welcome-prompt h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #e5e7eb;
+            margin-bottom: 12px;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+        }
+        
+        .welcome-prompt p {
+            font-size: 1rem;
+            color: #9ca3af;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .input-container {
             position: relative;
-            background: rgba(17, 17, 27, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 16px;
+            background: rgba(17, 17, 27, 0.5);
+            border: 1.5px solid rgba(99, 102, 241, 0.15);
+            border-radius: 24px;
             padding: 0;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.1);
-            transition: all 0.3s ease;
+            backdrop-filter: blur(40px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Processing Mode Selector */
+        /* Context Pills (Processing Mode) */
         .mode-selector {
-            padding: 16px 20px;
-            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+            padding: 18px 24px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.02) 0%, transparent 100%);
         }
 
         .mode-label {
-            font-size: 0.75rem;
-            color: #9ca3af;
-            margin-bottom: 10px;
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-bottom: 12px;
             display: block;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             font-weight: 600;
         }
 
         .mode-options {
             display: flex;
-            gap: 16px;
-            margin-bottom: 12px;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
         }
 
         .radio-option {
             display: flex;
             align-items: center;
             gap: 8px;
+            padding: 8px 16px;
+            background: rgba(99, 102, 241, 0.05);
+            border: 1.5px solid rgba(99, 102, 241, 0.12);
+            border-radius: 20px;
             cursor: pointer;
-            font-size: 0.9rem;
-            color: #d1d5db;
-            transition: color 0.2s;
+            font-size: 0.85rem;
+            color: #9ca3af;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .radio-option:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.25);
+            color: #d1d5db;
+        }
+        
+        .radio-option:has(input:checked) {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.4);
             color: #e5e7eb;
         }
 
         .radio-option input[type="radio"] {
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(99, 102, 241, 0.4);
-            border-radius: 50%;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s;
-        }
-
-        .radio-option input[type="radio"]:checked {
-            border-color: #6366f1;
-            background: rgba(99, 102, 241, 0.2);
-        }
-
-        .radio-option input[type="radio"]:checked::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background: #6366f1;
-            border-radius: 50%;
+            display: none; /* Hide radio button, use pill background instead */
         }
 
         .group-selector {
@@ -298,55 +327,59 @@
         }
 
         .input-container:focus-within {
-            border-color: rgba(99, 102, 241, 0.5);
-            box-shadow: 0 25px 70px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.3);
+            border-color: rgba(99, 102, 241, 0.35);
+            box-shadow: 0 12px 48px rgba(99, 102, 241, 0.12), 0 0 0 1px rgba(99, 102, 241, 0.2);
+            transform: translateY(-2px);
         }
 
         .main-textarea {
             width: 100%;
-            min-height: 180px;
-            padding: 24px;
+            min-height: 160px;
+            padding: 24px 26px;
             background: transparent;
             border: none;
             color: #e5e7eb;
             font-family: inherit;
-            font-size: 1.05rem;
-            line-height: 1.7;
+            font-size: 1rem;
+            line-height: 1.6;
             resize: none;
             outline: none;
         }
 
         .main-textarea::placeholder {
-            color: #4b5563;
+            color: #6b7280;
             font-weight: 400;
+            letter-spacing: -0.01em;
         }
 
         .input-actions {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
-            border-top: 1px solid rgba(99, 102, 241, 0.1);
+            padding: 16px 24px;
+            border-top: 1px solid rgba(99, 102, 241, 0.08);
+            background: linear-gradient(0deg, rgba(99, 102, 241, 0.02) 0%, transparent 100%);
         }
 
         .action-btn {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             border: none;
-            background: rgba(99, 102, 241, 0.15);
-            color: #818cf8;
+            background: rgba(99, 102, 241, 0.1);
+            color: #9ca3af;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
-            transition: all 0.2s ease;
+            font-size: 1.1rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
         }
 
         .action-btn:hover {
-            background: rgba(99, 102, 241, 0.25);
+            background: rgba(99, 102, 241, 0.18);
+            color: #d1d5db;
             transform: scale(1.05);
         }
 
@@ -355,13 +388,16 @@
         }
 
         .action-btn.submit-btn {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            width: 48px;
+            height: 48px;
+            background: rgba(99, 102, 241, 0.9);
             color: white;
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
         }
 
         .action-btn.submit-btn:hover {
-            box-shadow: 0 6px 30px rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 1);
+            box-shadow: 0 6px 24px rgba(99, 102, 241, 0.35);
             transform: scale(1.08);
         }
 
@@ -373,12 +409,12 @@
 
         .badge {
             position: absolute;
-            top: -4px;
-            right: -4px;
+            top: -6px;
+            right: -6px;
             min-width: 20px;
             height: 20px;
             padding: 0 6px;
-            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            background: rgba(239, 68, 68, 0.95);
             color: white;
             border-radius: 10px;
             font-size: 0.7rem;
@@ -387,12 +423,13 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+            border: 2px solid rgba(17, 17, 27, 0.8);
             animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.9; }
         }
 
         .action-left {
@@ -404,6 +441,7 @@
         .char-count {
             font-size: 0.75rem;
             color: #6b7280;
+            font-variant-numeric: tabular-nums;
         }
 
         /* Status Messages */
@@ -485,50 +523,52 @@
 
         /* Filters Section */
         .filters-section {
-            margin-bottom: 24px;
+            margin-bottom: 32px;
         }
 
         .filters-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .section-title {
-            font-size: 1rem;
+            font-size: 0.85rem;
             font-weight: 600;
             color: #9ca3af;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.2px;
         }
 
         .filter-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
         }
 
         .filter-select {
-            padding: 10px 14px;
-            background: rgba(17, 17, 27, 0.4);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 8px;
-            color: #e5e7eb;
+            padding: 11px 14px;
+            background: rgba(17, 17, 27, 0.5);
+            border: 1.5px solid rgba(99, 102, 241, 0.15);
+            border-radius: 10px;
+            color: #d1d5db;
             font-family: inherit;
             font-size: 0.85rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             outline: none;
+            backdrop-filter: blur(20px);
         }
 
         .filter-select:hover {
-            border-color: rgba(99, 102, 241, 0.4);
+            border-color: rgba(99, 102, 241, 0.3);
+            background: rgba(17, 17, 27, 0.6);
         }
 
         .filter-select:focus {
-            border-color: rgba(99, 102, 241, 0.6);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
         }
 
         .filter-select option {
@@ -537,20 +577,21 @@
         }
 
         .btn-reset {
-            padding: 10px 16px;
+            padding: 11px 18px;
             background: transparent;
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 8px;
-            color: #818cf8;
+            border: 1.5px solid rgba(99, 102, 241, 0.15);
+            border-radius: 10px;
+            color: #9ca3af;
             font-size: 0.85rem;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .btn-reset:hover {
-            background: rgba(99, 102, 241, 0.1);
-            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.08);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #d1d5db;
         }
 
         /* Thoughts List */
@@ -577,19 +618,20 @@
         }
 
         .thought-card {
-            background: rgba(17, 17, 27, 0.4);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 16px;
+            background: rgba(17, 17, 27, 0.5);
+            border: 1.5px solid rgba(99, 102, 241, 0.12);
+            border-radius: 14px;
+            padding: 18px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            backdrop-filter: blur(10px);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
         }
 
         .thought-card:hover {
-            background: rgba(17, 17, 27, 0.6);
-            border-color: rgba(99, 102, 241, 0.3);
-            transform: translateX(4px);
+            background: rgba(17, 17, 27, 0.7);
+            border-color: rgba(99, 102, 241, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
         }
 
         .thought-card.completed {
@@ -834,40 +876,58 @@
             }
 
             .app-title {
-                font-size: 1rem;
+                font-size: 0.95rem;
+            }
+            
+            .app-title .icon {
+                font-size: 1.2rem;
             }
 
             .header-stats {
-                gap: 12px;
+                display: none; /* Hide on mobile for cleaner look */
+            }
+            
+            .user-menu {
+                gap: 8px;
+            }
+            
+            .btn-manage-groups span:last-child,
+            .btn-search span:last-child {
+                display: none; /* Show only icons on mobile */
             }
 
-            .mini-stat-value {
+            .welcome-prompt h1 {
+                font-size: 1.8rem;
+            }
+            
+            .welcome-prompt p {
                 font-size: 0.9rem;
             }
 
-            .mini-stat-label {
-                font-size: 0.6rem;
-            }
-
             .input-section {
-                margin-top: 40px;
-                margin-bottom: 40px;
+                margin-top: 60px;
+                margin-bottom: 48px;
             }
 
             .main-textarea {
-                min-height: 150px;
+                min-height: 140px;
                 padding: 20px;
                 font-size: 1rem;
             }
 
             .input-actions {
-                padding: 12px 16px;
+                padding: 14px 20px;
             }
 
             .action-btn {
-                width: 36px;
-                height: 36px;
+                width: 40px;
+                height: 40px;
                 font-size: 1rem;
+            }
+            
+            .action-btn.submit-btn {
+                width: 44px;
+                height: 44px;
             }
 
             .filter-grid {
@@ -875,7 +935,7 @@
             }
 
             .thought-card {
-                padding: 14px;
+                padding: 16px;
             }
 
             .anonymous-banner {
@@ -1283,33 +1343,41 @@
     </style>
 </head>
 <body>
-    <!-- Compact Header with Mini Stats -->
+    <!-- Modern Clean Header -->
     <div class="header-row">
         <div class="app-title">
-            <span>🧠</span>
-            <span>Thought Processor</span>
+            <span class="icon">💭</span>
+            <span>AI Thought Processor</span>
         </div>
         
         <div class="header-stats">
             <div class="mini-stat">
-                <div class="mini-stat-value" id="anxietyLevel">0</div>
                 <div class="mini-stat-label">Anxiety</div>
+                <div class="mini-stat-value" id="anxietyLevel">0</div>
             </div>
             <div class="mini-stat">
-                <div class="mini-stat-value" id="criticalCount">0</div>
                 <div class="mini-stat-label">Critical</div>
+                <div class="mini-stat-value" id="criticalCount">0</div>
             </div>
             <div class="mini-stat">
-                <div class="mini-stat-value" id="clarityScore">0%</div>
                 <div class="mini-stat-label">Clarity</div>
+                <div class="mini-stat-value" id="clarityScore">0%</div>
             </div>
         </div>
 
         <div class="user-menu">
             <span class="user-email" id="userEmail"></span>
-            <a href="search.html" class="btn-search">🔍 Search</a>
-            <a href="groups.html" class="btn-manage-groups">👥 Groups</a>
-            <button class="btn-logout" onclick="logout()">Logout</button>
+            <a href="search.html" class="btn-search">
+                <span>🔍</span>
+                <span>Search</span>
+            </a>
+            <a href="groups.html" class="btn-manage-groups">
+                <span>👥</span>
+                <span>Groups</span>
+            </a>
+            <button class="btn-logout" onclick="logout()">
+                <span>Logout</span>
+            </button>
         </div>
     </div>
 
@@ -1321,18 +1389,25 @@
 
         <!-- Main Input Area - Centered and Prominent -->
         <div class="input-section">
+            <div class="welcome-prompt">
+                <h1>Process your thoughts with AI</h1>
+                <p>Share what's on your mind and get intelligent insights</p>
+            </div>
+            
             <div class="input-container">
-                <!-- Processing Mode Selector -->
+                <!-- Context Pills (Processing Mode) -->
                 <div class="mode-selector">
-                    <label class="mode-label">Processing Mode</label>
+                    <label class="mode-label">Context</label>
                     <div class="mode-options">
                         <label class="radio-option">
                             <input type="radio" name="processingMode" value="single" checked onchange="toggleGroupSelector()">
-                            <span>💭 Personal Feedback</span>
+                            <span>💭</span>
+                            <span>Personal Feedback</span>
                         </label>
                         <label class="radio-option">
                             <input type="radio" name="processingMode" value="group" onchange="toggleGroupSelector()">
-                            <span>👥 Group Perspectives</span>
+                            <span>👥</span>
+                            <span>Group Perspectives</span>
                         </label>
                     </div>
                     
@@ -1352,7 +1427,7 @@
                 <textarea 
                     id="thoughtText" 
                     class="main-textarea" 
-                    placeholder="What's on your mind? Share your thought, idea, or question..."
+                    placeholder="What's on your mind? Share your thoughts, ideas, or questions and let AI help you process them..."
                     maxlength="2000"
                     oninput="updateCharCount()"
                 ></textarea>
@@ -1377,7 +1452,7 @@
                         onclick="submitThought()" 
                         title="Submit thought"
                     >
-                        ➤
+                        ↑
                     </button>
                 </div>
             </div>
