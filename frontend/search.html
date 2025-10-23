@@ -311,6 +311,18 @@
     <script>
         const API_BASE = 'http://localhost:8000';
         
+        // Get authentication headers
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return headers;
+        }
+        
         async function search(queryText) {
             const resultsDiv = document.getElementById('results');
             const searchInput = document.getElementById('searchInput');
@@ -334,9 +346,7 @@
             try {
                 const response = await fetch(`${API_BASE}/search/thoughts`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({
                         query: query,
                         search_mode: searchMode,
@@ -433,7 +443,10 @@
             try {
                 const response = await fetch(
                     `${API_BASE}/search/thoughts/compare?query=${encodeURIComponent(query)}&top_k=5`,
-                    { method: 'POST' }
+                    { 
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    }
                 );
                 
                 if (!response.ok) {
