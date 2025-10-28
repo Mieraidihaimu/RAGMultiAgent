@@ -268,10 +268,29 @@ docker compose exec db psql -U thoughtprocessor
 
 ## Documentation
 
+### 🚀 New Developer? Start Here!
+- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - **Developer onboarding guide** ⭐
+
+### Getting Started
 - [QUICK_START.md](QUICK_START.md) - Detailed getting started guide
+- [README.md](README.md) - This file (overview and quick start)
+
+### Architecture & Contracts
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design decisions
+- **[SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md)** - **Service responsibilities and API contracts** ⭐
+- [SERVICE_CONTRACTS_QUICK_REFERENCE.md](SERVICE_CONTRACTS_QUICK_REFERENCE.md) - Quick reference for contracts
+- [SERVICE_ARCHITECTURE_DIAGRAM.md](SERVICE_ARCHITECTURE_DIAGRAM.md) - Visual service communication diagrams
+
+### Operations & Monitoring
 - [MONITORING.md](MONITORING.md) - Complete monitoring & observability guide
+- [MONITORING_QUICK_REFERENCE.md](MONITORING_QUICK_REFERENCE.md) - Quick monitoring reference
+
+### Testing & Deployment
 - [tests/README.md](tests/README.md) - Integration test documentation
-- [SAAS_SETUP.md](SAAS_SETUP.md) - Payment & subscription setup
+- [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - Deployment checklist
+
+### Features
+- [SEARCH_INTEGRATION.md](SEARCH_INTEGRATION.md) - Search functionality guide
 
 ## Tech Stack
 
