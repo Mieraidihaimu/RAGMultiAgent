@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - AI Thought Processor</title>
+    <script src="auth-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -496,48 +497,20 @@
 
             setLoading('login', true);
 
-            try {
-                const response = await fetch(`${API_BASE}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    // Store auth token and user info
-                    localStorage.setItem('auth_token', result.access_token);
-                    localStorage.setItem('user_email', email);
-
-                    // Fetch user info to get user_id
-                    const userResponse = await fetch(`${API_BASE}/api/auth/me`, {
-                        headers: {
-                            'Authorization': `Bearer ${result.access_token}`
-                        }
-                    });
-
-                    if (userResponse.ok) {
-                        const userData = await userResponse.json();
-                        localStorage.setItem('user_id', userData.id);
-                        localStorage.setItem('thought_user_id', userData.id);
-                    }
-
-                    // Convert anonymous thoughts if any
-                    await convertAnonymousThoughts(result.access_token);
-
-                    showAlert('success', 'Login successful! Redirecting...');
-
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 1000);
-                } else {
-                    showAlert('error', result.detail || 'Incorrect email or password');
-                    setLoading('login', false);
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showAlert('error', 'Connection error. Please check if the API is running.');
+            const result = await authManager.login(email, password);
+            
+            if (result.success) {
+                showAlert('success', 'Login successful! Redirecting...');
+                
+                // Check for redirect parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectTo = urlParams.get('redirect') || 'index.html';
+                
+                setTimeout(() => {
+                    window.location.href = redirectTo;
+                }, 1000);
+            } else {
+                showAlert('error', result.error || 'Login failed');
                 setLoading('login', false);
             }
         }
@@ -578,58 +551,39 @@
 
             setLoading('signup', true);
 
-            try {
-                const response = await fetch(`${API_BASE}/api/auth/signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        email,
-                        password,
-                        consent: {
-                            terms_accepted: consentTerms,
-                            terms_version: "1.0",
-                            privacy_accepted: consentPrivacy,
-                            privacy_version: "1.0",
-                            marketing: consentMarketing,
-                            analytics: consentAnalytics,
-                            data_processing: consentDataProcessing
-                        }
-                    })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showAlert('success', 'Account created! Redirecting...');
-
-                    // Store auth token and user info
-                    localStorage.setItem('auth_token', result.access_token);
-                    localStorage.setItem('user_id', result.user_id);
-                    localStorage.setItem('user_email', result.email);
-                    localStorage.setItem('thought_user_id', result.user_id);
-
-                    // Store consent preferences for analytics (if enabled)
-                    if (consentAnalytics) {
-                        localStorage.setItem('analytics_enabled', 'true');
-                    }
-                    if (consentMarketing) {
-                        localStorage.setItem('marketing_enabled', 'true');
-                    }
-
-                    // Convert anonymous thoughts if any
-                    await convertAnonymousThoughts(result.access_token);
-
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 1000);
-                } else {
-                    showAlert('error', result.detail || 'Signup failed');
-                    setLoading('signup', false);
+            const signupData = {
+                name,
+                email,
+                password,
+                consent: {
+                    terms_accepted: consentTerms,
+                    terms_version: "1.0",
+                    privacy_accepted: consentPrivacy,
+                    privacy_version: "1.0",
+                    marketing: consentMarketing,
+                    analytics: consentAnalytics,
+                    data_processing: consentDataProcessing
                 }
-            } catch (error) {
-                console.error('Signup error:', error);
-                showAlert('error', 'Connection error. Please check if the API is running.');
+            };
+
+            const result = await authManager.signup(signupData);
+
+            if (result.success) {
+                showAlert('success', 'Account created! Redirecting...');
+
+                // Store consent preferences for analytics (if enabled)
+                if (consentAnalytics) {
+                    localStorage.setItem('analytics_enabled', 'true');
+                }
+                if (consentMarketing) {
+                    localStorage.setItem('marketing_enabled', 'true');
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            } else {
+                showAlert('error', result.error || 'Signup failed');
                 setLoading('signup', false);
             }
         }
@@ -669,10 +623,47 @@
             }
         }
 
-        // Check if already logged in
-        if (localStorage.getItem('user_id')) {
-            window.location.href = 'index.html';
+        // Check if already logged in (using authManager)
+        // First, clear any stale session data on this page
+        async function checkExistingSession() {
+            if (authManager.isAuthenticated()) {
+                // Validate the session with the server
+                const isValid = await authManager.validateSession();
+                if (isValid) {
+                    // Valid session exists, redirect to app
+                    window.location.replace('index.html');
+                    return true;
+                } else {
+                    // Invalid session, clear it
+                    authManager.clearAuthData();
+                }
+            }
+            return false;
         }
+
+        // Initialize page
+        (async function() {
+            // Check for existing valid session
+            const hasValidSession = await checkExistingSession();
+            if (hasValidSession) return; // Will redirect
+            
+            // Show logout reason if provided
+            const urlParams = new URLSearchParams(window.location.search);
+            const reason = urlParams.get('reason');
+            if (reason) {
+                showAlert('error', reason);
+            }
+
+            // Show signup tab if requested
+            const signup = urlParams.get('signup');
+            if (signup) {
+                // Simulate click on signup tab
+                const signupTab = document.querySelector('.tab:last-child');
+                if (signupTab) {
+                    signupTab.click();
+                }
+            }
+        })();
     </script>
 </body>
 </html>

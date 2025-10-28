@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Persona Groups - AI Thought Processor</title>
+    <script src="auth-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -510,18 +511,17 @@
     <script>
         const API_BASE = 'http://localhost:8000';
 
-        // Get auth headers
+        // Require authentication on page load
+        authManager.requireAuth();
+
+        // Get auth headers (using authManager)
         function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
+            return authManager.getAuthHeaders();
         }
 
-        // Get user ID
+        // Get user ID (using authManager)
         function getUserId() {
-            return localStorage.getItem('user_id');
+            return authManager.getUserId();
         }
 
         // Show toast notification
@@ -541,19 +541,12 @@
         async function loadGroups() {
             const userId = getUserId();
             if (!userId) {
-                window.location.href = 'login.html';
+                authManager.logout('User not found');
                 return;
             }
 
             try {
-                const response = await fetch(`${API_BASE}/groups?user_id=${userId}&include_personas=true`, {
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    window.location.href = 'login.html';
-                    return;
-                }
+                const response = await authManager.apiRequest(`/groups?user_id=${userId}&include_personas=true`);
 
                 if (response.ok) {
                     const data = await response.json();

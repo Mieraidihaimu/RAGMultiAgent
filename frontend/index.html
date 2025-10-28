@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Thought Processor</title>
+    <script src="auth-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -1391,7 +1392,7 @@
                 <span>👥</span>
                 <span>Groups</span>
             </a>
-            <button class="btn-logout" onclick="logout()">
+            <button class="btn-logout" onclick="confirmLogout()">
                 <span>Logout</span>
             </button>
         </div>
@@ -1615,23 +1616,22 @@
             }
         }
 
-        // Check if user is authenticated
+        // Check if user is authenticated (using authManager)
         function checkAuth() {
-            const token = localStorage.getItem('auth_token');
-            const userId = localStorage.getItem('user_id');
-            
-            if (!token || !userId) {
-                isAnonymous = true;
-                setupAnonymousMode();
+            if (authManager.isAuthenticated()) {
+                isAnonymous = false;
                 return true;
             }
-            isAnonymous = false;
+            
+            // User is not authenticated, setup anonymous mode
+            isAnonymous = true;
+            setupAnonymousMode();
             return true;
         }
 
         // Setup anonymous user mode
         function setupAnonymousMode() {
-            let sessionToken = localStorage.getItem('anonymous_session_token');
+            const sessionToken = authManager.getAnonymousSession();
             if (!sessionToken) {
                 console.log('Anonymous mode: No session token yet');
             }
@@ -1706,32 +1706,31 @@
             window.location.href = 'login.html';
         }
 
-        // Get authentication headers
+        // Get authentication headers (using authManager)
         function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
+            return authManager.getAuthHeaders();
         }
 
-        // Get or create user ID
+        // Get or create user ID (using authManager)
         function getUserId() {
-            let userId = localStorage.getItem('user_id') || localStorage.getItem('thought_user_id');
+            const userId = authManager.getUserId();
             if (!userId && !isAnonymous) {
-                window.location.href = 'login.html';
+                authManager.logout('User ID not found');
                 return null;
             }
             return userId;
         }
 
-        // Handle logout
+        // Handle logout (using authManager)
         function logout() {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_id');
-            localStorage.removeItem('user_email');
-            localStorage.removeItem('thought_user_id');
-            window.location.href = 'login.html';
+            authManager.logout();
+        }
+        
+        // Confirm logout
+        function confirmLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                logout();
+            }
         }
 
         // Show status message

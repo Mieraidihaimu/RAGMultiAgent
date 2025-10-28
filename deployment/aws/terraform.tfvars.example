@@ -1,0 +1,25 @@
+# ==============================================================================
+# Terraform Variables File
+# ==============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# ==============================================================================
+
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "production"
+
+# EC2 Configuration
+instance_type = "t3.large"  # 2 vCPU, 8GB RAM - minimum recommended
+key_name      = "your-ssh-key-name"  # CHANGE THIS!
+
+# Security
+allowed_ssh_cidr = ["YOUR.IP.ADDRESS/32"]  # CHANGE THIS TO YOUR IP!
+
+# Optional Domain
+domain_name = ""  # e.g., "thoughtprocessor.example.com"
+
+# Monitoring
+enable_monitoring = true
+
+# Storage
+volume_size = 50  # GB
