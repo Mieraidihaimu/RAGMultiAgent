@@ -1,0 +1,262 @@
+/* ========================================
+   PERPLEXITY-INSPIRED SUMMER THEME
+   Happy, warm, and professional
+   ======================================== */
+
+:root {
+    /* Summer Color Palette */
+    --color-coral: #FF6B6B;
+    --color-peach: #FF8E53;
+    --color-yellow: #FFC93C;
+    --color-gold: #FFD93D;
+    --color-teal: #4ECDC4;
+    --color-mint: #44A08D;
+    --color-sky: #5DADE2;
+    --color-ocean: #3498DB;
+    
+    /* Neutrals */
+    --color-text-dark: #2C3E50;
+    --color-text-medium: #666;
+    --color-text-light: #999;
+    --color-bg-white: #FFFFFF;
+    --color-bg-light: #F8F9FA;
+    --color-bg-warm: #FFF5E6;
+    --color-border: #E0E0E0;
+    --color-border-warm: rgba(255, 200, 124, 0.2);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, var(--color-coral) 0%, var(--color-yellow) 100%);
+    --gradient-secondary: linear-gradient(135deg, var(--color-teal) 0%, var(--color-sky) 100%);
+    --gradient-warm: linear-gradient(135deg, rgba(255, 200, 124, 0.15), rgba(255, 142, 83, 0.12));
+    --gradient-bg: linear-gradient(135deg, #FFF5E6 0%, #FFF9F0 50%, #F0F9FF 100%);
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-warm: 0 8px 32px rgba(255, 142, 83, 0.1);
+    
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+    
+    /* Spacing */
+    --space-xs: 0.5rem;
+    --space-sm: 0.75rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+}
+
+/* Base Typography */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    color: var(--color-text-dark);
+    line-height: 1.6;
+}
+
+/* Button Styles */
+.btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.25);
+}
+
+.btn-secondary {
+    background: white;
+    border: 2px solid var(--color-border-warm);
+    color: var(--color-text-medium);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:hover {
+    background: var(--gradient-warm);
+    border-color: rgba(255, 142, 83, 0.4);
+    color: var(--color-coral);
+    transform: translateY(-1px);
+}
+
+.btn-teal {
+    background: var(--gradient-secondary);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-teal:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(78, 205, 196, 0.25);
+}
+
+/* Card Styles */
+.card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-border);
+    transition: all 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.card-warm {
+    border: 2px solid var(--color-border-warm);
+    box-shadow: var(--shadow-warm);
+}
+
+/* Input Styles */
+.input {
+    padding: 12px 16px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-family: inherit;
+    color: var(--color-text-dark);
+    background: white;
+    transition: all 0.2s;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--color-peach);
+    box-shadow: 0 0 0 3px rgba(255, 142, 83, 0.1);
+}
+
+.input::placeholder {
+    color: var(--color-text-light);
+}
+
+/* Badge Styles */
+.badge {
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge-primary {
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.15), rgba(255, 201, 60, 0.15));
+    color: var(--color-coral);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.badge-success {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--color-teal);
+    border: 1px solid rgba(78, 205, 196, 0.3);
+}
+
+.badge-warning {
+    background: rgba(255, 201, 60, 0.15);
+    color: #F39C12;
+    border: 1px solid rgba(255, 201, 60, 0.3);
+}
+
+.badge-info {
+    background: rgba(93, 173, 226, 0.15);
+    color: var(--color-sky);
+    border: 1px solid rgba(93, 173, 226, 0.3);
+}
+
+/* Utility Classes */
+.gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gradient-text-teal {
+    background: var(--gradient-secondary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.text-coral { color: var(--color-coral); }
+.text-teal { color: var(--color-teal); }
+.text-yellow { color: var(--color-yellow); }
+.text-medium { color: var(--color-text-medium); }
+.text-light { color: var(--color-text-light); }
+
+.bg-white { background: var(--color-bg-white); }
+.bg-light { background: var(--color-bg-light); }
+.bg-warm { background: var(--color-bg-warm); }
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg-light);
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--color-peach), var(--color-yellow));
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--color-coral), var(--color-peach));
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease;
+}
+
+.animate-slide-in {
+    animation: slideIn 0.4s ease;
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}

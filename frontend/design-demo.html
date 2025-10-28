@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Perplexity Summer Theme</title>
+    <link rel="stylesheet" href="summer-theme.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--gradient-bg);
+            min-height: 100vh;
+            padding: 2rem;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(255, 200, 124, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(78, 205, 196, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-warm);
+            margin-bottom: 3rem;
+            border: 2px solid var(--color-border-warm);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #2C3E50 0%, #FF6B6B 50%, #FFC93C 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--color-text-medium);
+            font-size: 1.1rem;
+        }
+
+        .section {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-dark);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--color-border-warm);
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .color-swatch {
+            padding: 3rem 1rem 1rem;
+            border-radius: var(--radius-md);
+            text-align: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .button-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .component-demo {
+            margin-bottom: 2rem;
+        }
+
+        .component-label {
+            font-size: 0.875rem;
+            color: var(--color-text-light);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .badge-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .input-demo {
+            max-width: 400px;
+        }
+
+        .gradient-demo {
+            height: 100px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.125rem;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 1rem;
+        }
+
+        code {
+            background: var(--color-bg-light);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: var(--color-coral);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--color-text-medium);
+            text-decoration: none;
+            margin-bottom: 2rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            color: var(--color-coral);
+            transform: translateX(-4px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">
+            ← Back to App
+        </a>
+
+        <div class="header">
+            <h1>🌞 Perplexity Summer Design System</h1>
+            <p>Clean, warm, and cheerful - A design system for happy interactions</p>
+        </div>
+
+        <!-- Colors -->
+        <div class="section">
+            <h2 class="section-title">Color Palette</h2>
+            <h3 style="margin-bottom: 1rem; color: var(--color-text-medium);">Primary Colors</h3>
+            <div class="color-grid">
+                <div class="color-swatch" style="background: #FF6B6B;">
+                    Coral<br>#FF6B6B
+                </div>
+                <div class="color-swatch" style="background: #FF8E53;">
+                    Peach<br>#FF8E53
+                </div>
+                <div class="color-swatch" style="background: #FFC93C;">
+                    Yellow<br>#FFC93C
+                </div>
+                <div class="color-swatch" style="background: #4ECDC4;">
+                    Teal<br>#4ECDC4
+                </div>
+                <div class="color-swatch" style="background: #5DADE2;">
+                    Sky<br>#5DADE2
+                </div>
+                <div class="color-swatch" style="background: #3498DB;">
+                    Ocean<br>#3498DB
+                </div>
+            </div>
+        </div>
+
+        <!-- Gradients -->
+        <div class="section">
+            <h2 class="section-title">Gradients</h2>
+            <div class="gradient-demo" style="background: linear-gradient(135deg, #FF6B6B 0%, #FFC93C 100%);">
+                Primary Gradient
+            </div>
+            <div class="gradient-demo" style="background: linear-gradient(135deg, #4ECDC4 0%, #5DADE2 100%);">
+                Secondary Gradient
+            </div>
+            <div class="gradient-demo" style="background: linear-gradient(135deg, #2C3E50 0%, #FF6B6B 50%, #FFC93C 100%);">
+                Hero Text Gradient
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="section">
+            <h2 class="section-title">Buttons</h2>
+            
+            <div class="component-demo">
+                <div class="component-label">Primary Buttons</div>
+                <div class="button-grid">
+                    <button class="btn btn-primary">Primary Button</button>
+                    <button class="btn btn-teal">Teal Button</button>
+                    <button class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">Disabled</button>
+                </div>
+            </div>
+
+            <div class="component-demo">
+                <div class="component-label">Secondary Buttons</div>
+                <div class="button-grid">
+                    <button class="btn btn-secondary">Secondary Button</button>
+                    <button class="btn btn-secondary">
+                        <span>🔍</span>
+                        <span>With Icon</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards -->
+        <div class="section">
+            <h2 class="section-title">Cards</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3 style="margin-bottom: 0.75rem; color: var(--color-text-dark);">Standard Card</h3>
+                    <p style="color: var(--color-text-medium); line-height: 1.6;">
+                        A clean, simple card with subtle shadow and border. Perfect for content containers.
+                    </p>
+                </div>
+                <div class="card card-warm">
+                    <h3 style="margin-bottom: 0.75rem;">
+                        <span class="gradient-text">Warm Card</span>
+                    </h3>
+                    <p style="color: var(--color-text-medium); line-height: 1.6;">
+                        A card with warm borders and shadow, ideal for highlighted content or primary actions.
+                    </p>
+                </div>
+                <div class="card" style="background: var(--gradient-warm);">
+                    <h3 style="margin-bottom: 0.75rem; color: var(--color-text-dark);">Gradient Background</h3>
+                    <p style="color: var(--color-text-medium); line-height: 1.6;">
+                        Subtle warm gradient background for special sections or call-outs.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Badges -->
+        <div class="section">
+            <h2 class="section-title">Badges & Tags</h2>
+            <div class="badge-group">
+                <span class="badge badge-primary">Primary</span>
+                <span class="badge badge-success">Success</span>
+                <span class="badge badge-warning">Warning</span>
+                <span class="badge badge-info">Info</span>
+                <span class="badge badge-primary">Completed</span>
+                <span class="badge badge-warning">Pending</span>
+                <span class="badge badge-info">Processing</span>
+            </div>
+        </div>
+
+        <!-- Inputs -->
+        <div class="section">
+            <h2 class="section-title">Form Inputs</h2>
+            
+            <div class="component-demo">
+                <div class="component-label">Text Input</div>
+                <div class="input-demo">
+                    <input type="text" class="input" placeholder="Enter your thought..." style="width: 100%;">
+                </div>
+            </div>
+
+            <div class="component-demo">
+                <div class="component-label">Textarea</div>
+                <div class="input-demo">
+                    <textarea class="input" placeholder="Write something wonderful..." rows="4" style="width: 100%; resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <div class="component-demo">
+                <div class="component-label">Select</div>
+                <div class="input-demo">
+                    <select class="input" style="width: 100%;">
+                        <option>Select an option...</option>
+                        <option>Personal Feedback</option>
+                        <option>Group Perspectives</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typography -->
+        <div class="section">
+            <h2 class="section-title">Typography</h2>
+            
+            <div style="margin-bottom: 2rem;">
+                <h1 class="gradient-text" style="font-size: 2.8rem; font-weight: 800; margin-bottom: 0.5rem;">
+                    Hero Heading
+                </h1>
+                <p style="color: var(--color-text-medium);">Main hero text with gradient</p>
+            </div>
+
+            <div style="margin-bottom: 2rem;">
+                <h2 style="font-size: 2rem; font-weight: 700; color: var(--color-text-dark); margin-bottom: 0.5rem;">
+                    Heading 2
+                </h2>
+                <p style="color: var(--color-text-medium);">Section headers</p>
+            </div>
+
+            <div style="margin-bottom: 2rem;">
+                <h3 style="font-size: 1.5rem; font-weight: 600; color: var(--color-text-dark); margin-bottom: 0.5rem;">
+                    Heading 3
+                </h3>
+                <p style="color: var(--color-text-medium);">Subsection headers</p>
+            </div>
+
+            <div style="margin-bottom: 2rem;">
+                <p style="font-size: 1rem; line-height: 1.6; color: var(--color-text-dark); margin-bottom: 0.5rem;">
+                    Body text - This is regular paragraph text. It should be comfortable to read with good line height and spacing. The color provides excellent contrast against light backgrounds.
+                </p>
+            </div>
+
+            <div>
+                <p style="font-size: 0.875rem; color: var(--color-text-light);">
+                    Small text - Used for secondary information, captions, and helper text.
+                </p>
+            </div>
+        </div>
+
+        <!-- Utilities -->
+        <div class="section">
+            <h2 class="section-title">Utility Classes</h2>
+            
+            <div class="component-demo">
+                <div class="component-label">Gradient Text</div>
+                <h3 class="gradient-text" style="font-size: 1.5rem; margin-bottom: 0.5rem;">Primary Gradient Text</h3>
+                <h3 class="gradient-text-teal" style="font-size: 1.5rem;">Secondary Gradient Text</h3>
+            </div>
+
+            <div class="component-demo">
+                <div class="component-label">Colored Text</div>
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <span class="text-coral" style="font-weight: 600;">Coral Text</span>
+                    <span class="text-teal" style="font-weight: 600;">Teal Text</span>
+                    <span class="text-yellow" style="font-weight: 600;">Yellow Text</span>
+                    <span class="text-medium" style="font-weight: 600;">Medium Text</span>
+                    <span class="text-light" style="font-weight: 600;">Light Text</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Example -->
+        <div class="section">
+            <h2 class="section-title">Quick Start</h2>
+            <p style="margin-bottom: 1rem; color: var(--color-text-medium);">
+                Include the theme CSS and start using the components:
+            </p>
+            <div style="background: var(--color-bg-light); padding: 1.5rem; border-radius: var(--radius-md); font-family: monospace; font-size: 0.875rem; overflow-x: auto;">
+                <pre style="margin: 0; color: var(--color-text-dark);">&lt;link rel="stylesheet" href="summer-theme.css"&gt;
+
+&lt;button class="btn btn-primary"&gt;
+    Click Me!
+&lt;/button&gt;
+
+&lt;div class="card card-warm"&gt;
+    &lt;h3 class="gradient-text"&gt;Hello Summer!&lt;/h3&gt;
+    &lt;p&gt;Beautiful, warm design&lt;/p&gt;
+&lt;/div&gt;</pre>
+            </div>
+        </div>
+
+        <div style="text-align: center; padding: 3rem 0; color: var(--color-text-light);">
+            <p>🌞 Made with sunshine and code</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                <a href="DESIGN_SYSTEM.md" style="color: var(--color-coral); text-decoration: none; font-weight: 600;">
+                    View Full Documentation →
+                </a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
