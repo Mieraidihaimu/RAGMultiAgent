@@ -3,7 +3,7 @@ Kafka Event Schemas
 These schemas define the contract between API Service and Kafka Workers.
 
 IMPORTANT: These are used for message serialization/deserialization.
-Breaking changes require version bumping and backward compatibility handling.
+All services must use these exact schemas.
 """
 
 from typing import Optional, Dict, Any, Literal
@@ -17,7 +17,6 @@ class BaseEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     event_type: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    schema_version: str = "1.0.0"
 
 
 class ThoughtCreatedEvent(BaseEvent):

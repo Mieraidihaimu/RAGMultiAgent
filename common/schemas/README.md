@@ -199,7 +199,7 @@ const thought: ThoughtResponse = await response.json();
 
 ### What is a breaking change?
 
-❌ **Breaking** (requires new schema version):
+❌ **Breaking** (avoid these):
 - Removing a required field
 - Renaming a field
 - Changing a field type
@@ -209,31 +209,14 @@ const thought: ThoughtResponse = await response.json();
 - Adding optional fields
 - Adding new enum values
 - Adding new event types
-- Deprecating (but not removing) fields
 
-### Version Migration
+### Handling Schema Changes
 
-When making breaking changes:
+Since the service is not deployed yet, you can modify schemas freely. Once deployed:
 
-1. **Bump schema version**:
-```python
-class ThoughtCreatedEvent(BaseEvent):
-    schema_version: str = "2.0.0"  # Was 1.0.0
-```
-
-2. **Support old versions**:
-```python
-def deserialize_event(data: dict):
-    version = data.get('schema_version', '1.0.0')
-    
-    if version == '1.0.0':
-        return ThoughtCreatedEventV1(**data)
-    elif version == '2.0.0':
-        return ThoughtCreatedEventV2(**data)
-```
-
-3. **Announce deprecation** (3 months notice)
-4. **Remove after support period** (6 months)
+1. **Add new optional fields** - Safe, won't break existing code
+2. **Add new schemas** - Safe, existing services ignore them
+3. **Breaking changes** - Update all services simultaneously before deploying
 
 ## Testing Schemas
 
