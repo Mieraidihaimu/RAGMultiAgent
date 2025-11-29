@@ -165,6 +165,19 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user record by email
+
+        Args:
+            email: User email
+
+        Returns:
+            User record or None
+        """
+        pass
+
+    @abstractmethod
     async def update_user_context(
         self,
         user_id: str,
@@ -176,6 +189,37 @@ class DatabaseAdapter(ABC):
         Args:
             user_id: User ID
             context: New context data
+
+        Returns:
+            Updated user record
+        """
+        pass
+
+    @abstractmethod
+    async def get_user_consent_status(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user's consent status
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with consent fields or None
+        """
+        pass
+
+    @abstractmethod
+    async def update_user_consent(
+        self,
+        user_id: str,
+        consent_updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update user consent preferences
+
+        Args:
+            user_id: User ID
+            consent_updates: Dict of consent fields to update
 
         Returns:
             Updated user record

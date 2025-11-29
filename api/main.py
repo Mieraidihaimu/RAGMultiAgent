@@ -97,7 +97,7 @@ except ImportError as e:
     logger.warning(f"Search routes not available: {e}")
 
 # Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+limiter = Limiter(key_func=get_remote_address, default_limits=["1000/minute"])
 
 # Configure logging
 logger.add(
@@ -1075,7 +1075,7 @@ async def stream_events(
     tags=["Persona Groups"],
     status_code=201
 )
-@limiter.limit("20/minute")
+@limiter.limit("1000/minute")
 async def create_persona_group(
     request: Request,
     group_input: PersonaGroupInput,
@@ -1121,7 +1121,7 @@ async def create_persona_group(
     response_model=PersonaGroupListResponse,
     tags=["Persona Groups"]
 )
-@limiter.limit("60/minute")
+@limiter.limit("1000/minute")
 async def list_persona_groups(
     request: Request,
     user_id: UUID = Query(..., description="User ID"),
@@ -1174,7 +1174,7 @@ async def get_persona_group(
     response_model=PersonaGroupResponse,
     tags=["Persona Groups"]
 )
-@limiter.limit("30/minute")
+@limiter.limit("1000/minute")
 async def update_persona_group(
     request: Request,
     group_id: UUID,

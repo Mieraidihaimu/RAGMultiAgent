@@ -21,6 +21,15 @@ from agents import AgentPipeline
 from semantic_cache import SemanticCache
 from common.database import DatabaseFactory
 from common.database.base import DatabaseAdapter
+from common.schemas.event_schemas import (
+    SSEThoughtProcessingEvent,
+    SSEAgentCompletedEvent,
+    SSEThoughtCompletedEvent,
+    SSEThoughtFailedEvent,
+    SSEGroupProcessingEvent,
+    SSEPersonaCompletedEvent,
+    SSEConsolidationEvent
+)
 
 # Prometheus metrics
 THOUGHTS_PROCESSED = Counter(
@@ -92,7 +101,7 @@ class ThoughtProcessor:
         }
 
     async def _publish_sse_update(self, user_id: str, event_type: str, data: Dict[str, Any]):
-        """Publish SSE update via Redis pub/sub"""
+        """Publish SSE update via Redis pub/sub using validated Pydantic schemas"""
         if not self.redis_client:
             return
 
@@ -107,16 +116,39 @@ class ThoughtProcessor:
                     return [convert_uuids(item) for item in obj]
                 return obj
             
-            channel = f"thought_updates:{user_id}"
-            payload = {
-                "event": event_type,
-                "timestamp": datetime.utcnow().isoformat(),
-                "data": convert_uuids(data)
+            # Create validated SSE event based on type
+            data_clean = convert_uuids(data)
+            
+            # Map event type to schema
+            schema_map = {
+                'thought_processing': SSEThoughtProcessingEvent,
+                'agent_completed': SSEAgentCompletedEvent,
+                'thought_completed': SSEThoughtCompletedEvent,
+                'thought_failed': SSEThoughtFailedEvent,
+                'group_processing_started': SSEGroupProcessingEvent,
+                'persona_completed': SSEPersonaCompletedEvent,
+                'consolidation_started': SSEConsolidationEvent,
             }
-            await self.redis_client.publish(channel, json.dumps(payload))
-            logger.debug(f"Published SSE update: {event_type} to {channel}")
+            
+            schema_class = schema_map.get(event_type)
+            if schema_class:
+                # Validate and serialize using Pydantic
+                sse_event = schema_class(event=event_type, data=data_clean)
+                message = sse_event.to_json_str()
+            else:
+                # Fallback for unknown event types (backward compatibility)
+                logger.warning(f\"Unknown SSE event type: {event_type}, using fallback\")
+                message = json.dumps({
+                    \"event\": event_type,
+                    \"timestamp\": datetime.utcnow().isoformat(),
+                    \"data\": data_clean
+                })
+            
+            channel = f\"thought_updates:{user_id}\"
+            await self.redis_client.publish(channel, message)
+            logger.debug(f\"Published validated SSE update: {event_type} to {channel}\")
         except Exception as e:
-            logger.warning(f"Failed to publish SSE update: {e}")
+            logger.warning(f\"Failed to publish SSE update: {e}\")
 
     async def get_pending_thoughts(self) -> List[Dict[str, Any]]:
         """

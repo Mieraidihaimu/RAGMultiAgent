@@ -5,10 +5,18 @@ Each agent performs a specific analysis task
 import json
 from typing import Dict, Any, List
 from loguru import logger
+from pydantic import ValidationError
 
 from config import settings
 from ai_providers import AIProviderFactory
 from ai_providers.base import AIMessage
+from common.schemas.ai_schemas import (
+    ClassificationOutput,
+    AnalysisOutput,
+    ValueImpactOutput,
+    ActionPlanOutput,
+    PriorityOutput
+)
 
 
 class AgentPipeline:
@@ -117,6 +125,9 @@ goals, constraints, and values. Always be honest, insightful, and actionable."""
         """
         Agent 1: Classification & Extraction
         Extracts structured information from the thought
+        
+        Returns:
+            Validated ClassificationOutput as dict
         """
         prompt = f"""Analyze this thought and extract structured information:
 
@@ -128,14 +139,23 @@ Return ONLY a valid JSON object with these exact fields (no additional text):
 - entities: {{people: [], dates: [], places: [], topics: []}}
 - emotional_tone: (excited/anxious/frustrated/neutral/curious/overwhelmed/hopeful)
 - implied_needs: [list of what the person might need]
-- complexity: (simple/moderate/complex)
 
 Be specific and context-aware. Consider the user's background. RESPOND WITH ONLY JSON, NO MARKDOWN OR ADDITIONAL TEXT."""
 
         try:
             result = await self._generate_json_response(prompt, user_context, max_tokens=1000)
-            logger.debug(f"Classification complete: {result.get('type')}")
-            return result
+            
+            # Validate against schema
+            try:
+                validated = ClassificationOutput(**result)
+                logger.debug(f"Classification complete and validated: {validated.type}")
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.error(f"Classification output validation failed: {ve}")
+                logger.error(f"Raw output: {result}")
+                # Return raw result with validation error for debugging
+                return {"error": "Validation failed", "details": str(ve), "raw": result}
+                
         except Exception as e:
             logger.error(f"Classification failed: {e}")
             raise
@@ -149,6 +169,9 @@ Be specific and context-aware. Consider the user's background. RESPOND WITH ONLY
         """
         Agent 2: Contextual Analysis
         Provides deep contextual understanding
+        
+        Returns:
+            Validated AnalysisOutput as dict
         """
         prompt = f"""Provide deep contextual analysis of this thought:
 
@@ -159,16 +182,24 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no additio
 - goal_alignment: {{aligned_goals: [], conflicting_goals: [], reasoning: ""}}
 - underlying_needs: [deeper needs beyond surface thought]
 - pattern_connections: [how this relates to user's recent challenges/patterns]
-- realistic_assessment: {{feasibility: "", given_constraints: "", time_required: ""}}
+- realistic_assessment: {{feasibility: "", constraints: []}}
 - unspoken_factors: [important considerations the user may not have mentioned]
-- opportunity_cost: ""
 
 Be honest, insightful, and consider the user's complete context. RESPOND WITH ONLY JSON, NO MARKDOWN OR ADDITIONAL TEXT."""
 
         try:
             result = await self._generate_json_response(prompt, user_context, max_tokens=1500)
-            logger.debug("Contextual analysis complete")
-            return result
+            
+            # Validate against schema
+            try:
+                validated = AnalysisOutput(**result)
+                logger.debug("Contextual analysis complete and validated")
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.error(f"Analysis output validation failed: {ve}")
+                logger.error(f"Raw output: {result}")
+                return {"error": "Validation failed", "details": str(ve), "raw": result}
+                
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
             raise
@@ -236,8 +267,17 @@ Be realistic and consider both positive and negative impacts."""
 
         try:
             result = await self._generate_json_response(prompt, user_context, max_tokens=2000)
-            logger.debug(f"Value assessment complete: weighted_total={result.get('weighted_total')}")
-            return result
+            
+            # Validate against schema
+            try:
+                validated = ValueImpactOutput(**result)
+                logger.debug(f"Value assessment complete and validated: weighted_total={validated.weighted_total}")
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.error(f"Value impact output validation failed: {ve}")
+                logger.error(f"Raw output: {result}")
+                return {"error": "Validation failed", "details": str(ve), "raw": result}
+                
         except Exception as e:
             logger.error(f"Value assessment failed: {e}")
             raise
@@ -301,8 +341,17 @@ Be specific and actionable. Consider the user's time and energy constraints."""
 
         try:
             result = await self._generate_json_response(prompt, user_context, max_tokens=2000)
-            logger.debug(f"Action planning complete: {len(result.get('main_actions', []))} actions")
-            return result
+            
+            # Validate against schema
+            try:
+                validated = ActionPlanOutput(**result)
+                logger.debug(f"Action planning complete and validated: {len(validated.main_actions)} actions")
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.error(f"Action plan output validation failed: {ve}")
+                logger.error(f"Raw output: {result}")
+                return {"error": "Validation failed", "details": str(ve), "raw": result}
+                
         except Exception as e:
             logger.error(f"Action planning failed: {e}")
             raise
@@ -355,8 +404,17 @@ RESPOND WITH ONLY JSON, NO MARKDOWN OR ADDITIONAL TEXT."""
 
         try:
             result = await self._generate_json_response(prompt, user_context, max_tokens=1500)
-            logger.debug(f"Prioritization complete: {result.get('priority_level')}")
-            return result
+            
+            # Validate against schema
+            try:
+                validated = PriorityOutput(**result)
+                logger.debug(f"Prioritization complete and validated: {validated.priority_level}")
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.error(f"Priority output validation failed: {ve}")
+                logger.error(f"Raw output: {result}")
+                return {"error": "Validation failed", "details": str(ve), "raw": result}
+                
         except Exception as e:
             logger.error(f"Prioritization failed: {e}")
             raise

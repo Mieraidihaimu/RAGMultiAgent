@@ -472,6 +472,107 @@ class PostgreSQLAdapter(DatabaseAdapter):
             # Decrypt context field
             return self._decrypt_row_fields(dict(row))
 
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user record by email (decrypts context field)
+
+        Args:
+            email: User email
+
+        Returns:
+            User record with decrypted context or None
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM users WHERE email = $1",
+                email
+            )
+            if not row:
+                return None
+
+            # Decrypt context field
+            return self._decrypt_row_fields(dict(row))
+
+    async def get_user_consent_status(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user's consent status
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with consent fields or None
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT
+                    consent_terms_accepted,
+                    consent_terms_accepted_at,
+                    consent_terms_version,
+                    consent_privacy_accepted,
+                    consent_privacy_accepted_at,
+                    consent_privacy_version,
+                    consent_marketing,
+                    consent_marketing_at,
+                    consent_analytics,
+                    consent_analytics_at,
+                    consent_data_processing,
+                    consent_data_processing_at,
+                    data_retention_acknowledged
+                FROM users
+                WHERE id = $1
+                """,
+                user_id
+            )
+            if not row:
+                return None
+
+            return dict(row)
+
+    async def update_user_consent(
+        self,
+        user_id: str,
+        consent_updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update user consent preferences
+
+        Args:
+            user_id: User ID
+            consent_updates: Dict of consent fields to update
+
+        Returns:
+            Updated user record
+        """
+        # Build dynamic UPDATE query based on provided fields
+        set_clauses = []
+        params = [user_id]
+        param_idx = 2
+
+        for field, value in consent_updates.items():
+            set_clauses.append(f"{field} = ${param_idx}")
+            params.append(value)
+            param_idx += 1
+
+        if not set_clauses:
+            # No fields to update, return current user
+            return await self.get_user(user_id)
+
+        query = f"""
+            UPDATE users
+            SET {', '.join(set_clauses)}
+            WHERE id = $1
+            RETURNING *
+        """
+
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, *params)
+            if not row:
+                return None
+
+            return self._decrypt_row_fields(dict(row))
+
     async def update_user_context(
         self,
         user_id: str,

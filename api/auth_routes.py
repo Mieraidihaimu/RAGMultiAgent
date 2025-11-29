@@ -191,12 +191,8 @@ async def login(credentials: UserLogin, db: DatabaseAdapter = Depends(get_db)):
     Returns a JWT access token for authenticated requests
     """
     try:
-        # Get user from database - use the database pool directly
-        async with db.pool.acquire() as conn:
-            user = await conn.fetchrow(
-                "SELECT id, email, password_hash, name FROM users WHERE email = $1",
-                credentials.email
-            )
+        # Get user from database using adapter method
+        user = await db.get_user_by_email(credentials.email)
 
         if not user:
             raise HTTPException(
@@ -245,12 +241,8 @@ async def get_current_user_info(
     Requires valid JWT token in Authorization header
     """
     try:
-        # Get user from database - use the database pool directly
-        async with db.pool.acquire() as conn:
-            user = await conn.fetchrow(
-                "SELECT id, email, name, created_at FROM users WHERE id = $1",
-                current_user.user_id
-            )
+        # Get user from database using adapter method
+        user = await db.get_user(str(current_user.user_id))
 
         if not user:
             raise HTTPException(
@@ -317,28 +309,7 @@ async def get_consent_status(
     - Timestamps and versions
     """
     try:
-        async with db.pool.acquire() as conn:
-            consent_data = await conn.fetchrow(
-                """
-                SELECT
-                    consent_terms_accepted,
-                    consent_terms_accepted_at,
-                    consent_terms_version,
-                    consent_privacy_accepted,
-                    consent_privacy_accepted_at,
-                    consent_privacy_version,
-                    consent_marketing,
-                    consent_marketing_at,
-                    consent_analytics,
-                    consent_analytics_at,
-                    consent_data_processing,
-                    consent_data_processing_at,
-                    data_retention_acknowledged
-                FROM users
-                WHERE id = $1
-                """,
-                current_user.user_id
-            )
+        consent_data = await db.get_user_consent_status(str(current_user.user_id))
 
         if not consent_data:
             raise HTTPException(
@@ -405,55 +376,29 @@ async def update_consent(
         user_agent = request.headers.get("user-agent", "")
         current_time = datetime.utcnow()
 
-        update_fields = []
-        update_values = []
-        param_counter = 1
+        # Build consent updates dict
+        consent_updates = {}
 
         if consent_update.marketing is not None:
-            update_fields.append(f"consent_marketing = ${param_counter}")
-            update_values.append(consent_update.marketing)
-            param_counter += 1
-
-            update_fields.append(f"consent_marketing_at = ${param_counter}")
-            update_values.append(current_time)
-            param_counter += 1
+            consent_updates['consent_marketing'] = consent_update.marketing
+            consent_updates['consent_marketing_at'] = current_time
 
         if consent_update.analytics is not None:
-            update_fields.append(f"consent_analytics = ${param_counter}")
-            update_values.append(consent_update.analytics)
-            param_counter += 1
+            consent_updates['consent_analytics'] = consent_update.analytics
+            consent_updates['consent_analytics_at'] = current_time
 
-            update_fields.append(f"consent_analytics_at = ${param_counter}")
-            update_values.append(current_time)
-            param_counter += 1
-
-        if not update_fields:
+        if not consent_updates:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No consent preferences provided for update"
             )
 
-        # Update IP and user agent for audit trail
-        update_fields.append(f"consent_ip_address = ${param_counter}")
-        update_values.append(client_ip)
-        param_counter += 1
+        # Add audit trail fields
+        consent_updates['consent_ip_address'] = client_ip
+        consent_updates['consent_user_agent'] = user_agent
 
-        update_fields.append(f"consent_user_agent = ${param_counter}")
-        update_values.append(user_agent)
-        param_counter += 1
-
-        # Add user_id as the last parameter
-        update_values.append(current_user.user_id)
-
-        async with db.pool.acquire() as conn:
-            await conn.execute(
-                f"""
-                UPDATE users
-                SET {', '.join(update_fields)}
-                WHERE id = ${param_counter}
-                """,
-                *update_values
-            )
+        # Update using adapter method
+        await db.update_user_consent(str(current_user.user_id), consent_updates)
 
         logger.info(f"Consent preferences updated for user: {current_user.email}")
 

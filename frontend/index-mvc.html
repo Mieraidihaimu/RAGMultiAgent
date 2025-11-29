@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Thought Processor - MVC</title>
+    
+    <!-- Load Auth Manager First -->
+    <script src="auth-manager.js"></script>
+    
+    <!-- Load Services -->
+    <script src="services/ApiService.js"></script>
+    
+    <!-- Load Models -->
+    <script src="models/ThoughtModel.js"></script>
+    <script src="models/GroupModel.js"></script>
+    
+    <!-- Load Views -->
+    <script src="views/ThoughtView.js"></script>
+    <script src="views/FormView.js"></script>
+    <script src="views/FilterView.js"></script>
+    
+    <!-- Load Controllers -->
+    <script src="controllers/ThoughtController.js"></script>
+    <script src="controllers/StreamController.js"></script>
+    
+    <!-- Load App Initializer -->
+    <script src="app.js"></script>
+    
+    <style>
+        /* Existing styles from index.html */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #FFF5E6 0%, #FFF9F0 50%, #F0F9FF 100%);
+            min-height: 100vh;
+            color: #2C3E50;
+        }
+        
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 28px;
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(255, 200, 124, 0.15);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .app-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FFC93C 50%, #4ECDC4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .anonymous-banner {
+            margin: 20px 0;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 12px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .btn-signup {
+            padding: 8px 18px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .thought-input-section {
+            margin: 30px 0;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            resize: vertical;
+        }
+        
+        .action-row {
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .submit-btn {
+            padding: 12px 24px;
+            background: rgba(99, 102, 241, 0.9);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+        
+        .submit-btn:hover {
+            background: rgba(99, 102, 241, 1);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .char-count {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .status-message {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        
+        .status-message.show {
+            display: block;
+        }
+        
+        .status-message.success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+        
+        .status-message.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        
+        .status-message.info {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+        }
+        
+        .filters-section {
+            margin-bottom: 32px;
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+        
+        .filter-select {
+            padding: 11px 14px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1.5px solid rgba(99, 102, 241, 0.15);
+            border-radius: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        
+        .thoughts-section {
+            margin-bottom: 40px;
+        }
+        
+        .thought-count {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        
+        .thoughts-list {
+            margin-top: 20px;
+        }
+        
+        .thought-card {
+            margin-bottom: 16px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .thought-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .thought-meta {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .status-badge, .priority-badge, .category-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.completed {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+        
+        .status-badge.processing {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+        
+        .status-badge.pending {
+            background: rgba(156, 163, 175, 0.15);
+            color: #6b7280;
+        }
+        
+        .thought-content {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        
+        .thought-date {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(99, 102, 241, 0.2);
+            border-top-color: rgba(99, 102, 241, 0.8);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+        
+        .empty-text {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header-row">
+        <div class="app-title">
+            <span class="icon">🧠</span>
+            AI Thought Processor
+        </div>
+        <div id="userEmail"></div>
+    </div>
+
+    <div class="container">
+        <!-- Anonymous Banner -->
+        <div id="anonymousBanner" class="anonymous-banner"></div>
+
+        <!-- Thought Input Section -->
+        <div class="thought-input-section">
+            <form id="thoughtForm">
+                <textarea 
+                    id="thoughtText" 
+                    name="thoughtText"
+                    placeholder="Share your thought..." 
+                    maxlength="2000"
+                    required
+                ></textarea>
+                
+                <div class="action-row">
+                    <span class="char-count" id="charCount">0 / 2000</span>
+                    <button type="submit" id="submitBtn" class="submit-btn">
+                        Submit Thought
+                    </button>
+                </div>
+                
+                <input type="hidden" name="processingMode" value="fast">
+                <input type="hidden" name="selectedGroup" value="">
+                
+                <div id="statusMessage" class="status-message"></div>
+            </form>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filters-section">
+            <div class="filter-grid">
+                <select id="filterStatus" class="filter-select">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+                
+                <select id="filterPriority" class="filter-select">
+                    <option value="all">All Priorities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                
+                <select id="filterCategory" class="filter-select">
+                    <option value="all">All Categories</option>
+                    <option value="idea">Idea</option>
+                    <option value="question">Question</option>
+                    <option value="concern">Concern</option>
+                    <option value="observation">Observation</option>
+                    <option value="reflection">Reflection</option>
+                </select>
+                
+                <select id="sortBy" class="filter-select">
+                    <option value="created_desc">Newest First</option>
+                    <option value="created_asc">Oldest First</option>
+                    <option value="priority_desc">Priority (High-Low)</option>
+                    <option value="value_desc">Value (High-Low)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Thoughts List -->
+        <div class="thoughts-section">
+            <div class="thoughts-header">
+                <span class="thought-count" id="thoughtCount">0 thoughts</span>
+            </div>
+            
+            <div id="thoughtsList" class="thoughts-list">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading thoughts...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

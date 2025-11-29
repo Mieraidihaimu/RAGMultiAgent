@@ -77,6 +77,58 @@ class ThoughtFailedEvent(BaseEvent):
     retry_count: int = 0
 
 
+# ============================================================================
+# SSE EVENT SCHEMAS (Redis Pub/Sub)
+# ============================================================================
+
+class SSEEventBase(BaseModel):
+    """Base schema for all SSE events published to Redis"""
+    event: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    data: Dict[str, Any]
+    
+    def to_json_str(self) -> str:
+        """Serialize to JSON string for Redis pub/sub"""
+        import json
+        # Convert datetime to ISO format
+        return self.model_dump_json()
+
+
+class SSEThoughtProcessingEvent(SSEEventBase):
+    """SSE: Thought processing started"""
+    event: Literal['thought_processing'] = 'thought_processing'
+
+
+class SSEAgentCompletedEvent(SSEEventBase):
+    """SSE: Individual agent completed"""
+    event: Literal['agent_completed'] = 'agent_completed'
+
+
+class SSEThoughtCompletedEvent(SSEEventBase):
+    """SSE: All processing completed"""
+    event: Literal['thought_completed'] = 'thought_completed'
+
+
+class SSEThoughtFailedEvent(SSEEventBase):
+    """SSE: Processing failed"""
+    event: Literal['thought_failed'] = 'thought_failed'
+
+
+class SSEGroupProcessingEvent(SSEEventBase):
+    """SSE: Group processing started"""
+    event: Literal['group_processing_started'] = 'group_processing_started'
+
+
+class SSEPersonaCompletedEvent(SSEEventBase):
+    """SSE: Individual persona completed"""
+    event: Literal['persona_completed'] = 'persona_completed'
+
+
+class SSEConsolidationEvent(SSEEventBase):
+    """SSE: Consolidation started"""
+    event: Literal['consolidation_started'] = 'consolidation_started'
+
+
 # Event schema mapping for deserialization
 EVENT_SCHEMA_MAP = {
     'thought_created': ThoughtCreatedEvent,
@@ -84,4 +136,14 @@ EVENT_SCHEMA_MAP = {
     'thought_agent_completed': ThoughtAgentCompletedEvent,
     'thought_completed': ThoughtCompletedEvent,
     'thought_failed': ThoughtFailedEvent,
+}
+
+SSE_EVENT_SCHEMA_MAP = {
+    'thought_processing': SSEThoughtProcessingEvent,
+    'agent_completed': SSEAgentCompletedEvent,
+    'thought_completed': SSEThoughtCompletedEvent,
+    'thought_failed': SSEThoughtFailedEvent,
+    'group_processing_started': SSEGroupProcessingEvent,
+    'persona_completed': SSEPersonaCompletedEvent,
+    'consolidation_started': SSEConsolidationEvent,
 }

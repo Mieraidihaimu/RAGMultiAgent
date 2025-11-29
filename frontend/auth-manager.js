@@ -13,12 +13,12 @@ class AuthManager {
         this.ANON_SESSION_KEY = 'anonymous_session_token';
         this.TOKEN_EXPIRY_KEY = 'token_expiry';
         this.LAST_ACTIVITY_KEY = 'last_activity';
-        
+
         // Session timeout: 24 hours
         this.SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
         // Inactivity timeout: 2 hours
         this.INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000;
-        
+
         // Initialize activity tracking
         this.initActivityTracking();
     }
@@ -41,7 +41,7 @@ class AuthManager {
 
         // Check session validity every minute
         setInterval(() => this.validateSession(), 60000);
-        
+
         // Also check when tab becomes visible (user switches back to tab)
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden && this.isAuthenticated()) {
@@ -60,17 +60,17 @@ class AuthManager {
     isAuthenticated() {
         const token = this.getToken();
         if (!token) return false;
-        
+
         // Check if session is expired
         if (this.isSessionExpired()) {
             // Clean up expired session silently
             this.clearAuthData();
             return false;
         }
-        
+
         return true;
     }
-    
+
     /**
      * Clear authentication data without redirect
      */
@@ -149,34 +149,26 @@ class AuthManager {
         if (!this.isAuthenticated()) return false;
 
         try {
-            const response = await fetch(`${this.API_BASE}/api/auth/me`, {
-                headers: this.getAuthHeaders()
-            });
+            // Use apiService instead of direct fetch
+            // We can't use apiService.request here directly if it depends on authManager
+            // Circular dependency risk. But apiService uses authManager.getAuthHeaders()
+            // Let's assume apiService is globally available
 
-            if (response.status === 401 || response.status === 403) {
-                // Don't call logout here to avoid redirect loops
-                // Just clear the invalid token
-                localStorage.removeItem(this.TOKEN_KEY);
-                localStorage.removeItem(this.USER_ID_KEY);
-                localStorage.removeItem(this.USER_EMAIL_KEY);
-                localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
-                localStorage.removeItem(this.LAST_ACTIVITY_KEY);
-                return false;
-            }
+            const userData = await apiService.request('/api/auth/me');
 
-            if (response.ok) {
-                const userData = await response.json();
-                // Update user data in storage
-                localStorage.setItem(this.USER_ID_KEY, userData.id);
-                localStorage.setItem(this.USER_EMAIL_KEY, userData.email);
-                // Update activity timestamp
-                localStorage.setItem(this.LAST_ACTIVITY_KEY, Date.now().toString());
-                return true;
-            }
+            // Update user data in storage
+            localStorage.setItem(this.USER_ID_KEY, userData.id);
+            localStorage.setItem(this.USER_EMAIL_KEY, userData.email);
+            // Update activity timestamp
+            localStorage.setItem(this.LAST_ACTIVITY_KEY, Date.now().toString());
+            return true;
 
-            return false;
         } catch (error) {
             console.error('Session validation error:', error);
+            if (error.message === 'Unauthorized') {
+                this.clearAuthData();
+                return false;
+            }
             // Network errors shouldn't invalidate the session
             return false;
         }
@@ -187,25 +179,22 @@ class AuthManager {
      */
     async login(email, password) {
         try {
-            const response = await fetch(`${this.API_BASE}/api/auth/login`, {
+            const data = await apiService.request('/api/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Login failed');
-            }
-
-            const data = await response.json();
-            
             // Store authentication data
             this.setAuthData(data.access_token, email);
-            
+
             // Fetch and store user ID
-            await this.fetchUserProfile(data.access_token);
-            
+            if (data.user_id) {
+                localStorage.setItem(this.USER_ID_KEY, data.user_id);
+                localStorage.setItem('thought_user_id', data.user_id);
+            } else {
+                await this.fetchUserProfile(data.access_token);
+            }
+
             // Convert anonymous thoughts if any
             await this.convertAnonymousThoughts();
 
@@ -221,22 +210,14 @@ class AuthManager {
      */
     async signup(userData) {
         try {
-            const response = await fetch(`${this.API_BASE}/api/auth/signup`, {
+            const data = await apiService.request('/api/auth/signup', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Signup failed');
-            }
-
-            const data = await response.json();
-            
             // Store authentication data
             this.setAuthData(data.access_token, userData.email, data.user_id);
-            
+
             // Convert anonymous thoughts if any
             await this.convertAnonymousThoughts();
 
@@ -256,7 +237,7 @@ class AuthManager {
             window.eventSource.close();
             window.eventSource = null;
         }
-        
+
         // Clear all auth-related data
         localStorage.removeItem(this.TOKEN_KEY);
         localStorage.removeItem(this.USER_ID_KEY);
@@ -276,10 +257,10 @@ class AuthManager {
         }
 
         // Force page reload to clear any cached state
-        const redirectUrl = reason 
+        const redirectUrl = reason
             ? `login.html?reason=${encodeURIComponent(reason)}`
             : 'login.html';
-        
+
         // Use replace to prevent back button from restoring session
         window.location.replace(redirectUrl);
     }
@@ -290,16 +271,16 @@ class AuthManager {
     setAuthData(token, email, userId = null) {
         localStorage.setItem(this.TOKEN_KEY, token);
         localStorage.setItem(this.USER_EMAIL_KEY, email);
-        
+
         if (userId) {
             localStorage.setItem(this.USER_ID_KEY, userId);
             localStorage.setItem('thought_user_id', userId); // Legacy compatibility
         }
-        
+
         // Set token expiry (24 hours from now)
         const expiry = Date.now() + this.SESSION_TIMEOUT;
         localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiry.toString());
-        
+
         // Set initial activity timestamp
         localStorage.setItem(this.LAST_ACTIVITY_KEY, Date.now().toString());
     }
@@ -309,19 +290,16 @@ class AuthManager {
      */
     async fetchUserProfile(token = null) {
         try {
-            const headers = token 
-                ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                : this.getAuthHeaders();
+            const options = token
+                ? { headers: { 'Authorization': `Bearer ${token}` } }
+                : {};
 
-            const response = await fetch(`${this.API_BASE}/api/auth/me`, { headers });
+            const userData = await apiService.request('/api/auth/me', options);
 
-            if (response.ok) {
-                const userData = await response.json();
-                localStorage.setItem(this.USER_ID_KEY, userData.id);
-                localStorage.setItem(this.USER_EMAIL_KEY, userData.email);
-                localStorage.setItem('thought_user_id', userData.id); // Legacy compatibility
-                return userData;
-            }
+            localStorage.setItem(this.USER_ID_KEY, userData.id);
+            localStorage.setItem(this.USER_EMAIL_KEY, userData.email);
+            localStorage.setItem('thought_user_id', userData.id); // Legacy compatibility
+            return userData;
         } catch (error) {
             console.error('Error fetching user profile:', error);
         }
@@ -332,28 +310,22 @@ class AuthManager {
      * Convert anonymous thoughts to user account
      */
     async convertAnonymousThoughts() {
-        const sessionToken = localStorage.getItem('pending_conversion_token') || 
-                            this.getAnonymousSession();
-        
+        const sessionToken = localStorage.getItem('pending_conversion_token') ||
+            this.getAnonymousSession();
+
         if (!sessionToken) return;
 
         try {
-            const response = await fetch(
-                `${this.API_BASE}/api/auth/convert-anonymous?session_token=${sessionToken}`,
-                {
-                    method: 'POST',
-                    headers: this.getAuthHeaders()
-                }
+            const data = await apiService.request(
+                `/api/auth/convert-anonymous?session_token=${sessionToken}`,
+                { method: 'POST' }
             );
 
-            if (response.ok) {
-                const data = await response.json();
-                console.log(`Converted ${data.thoughts_converted} anonymous thoughts`);
-                
-                // Clean up anonymous session data
-                localStorage.removeItem(this.ANON_SESSION_KEY);
-                localStorage.removeItem('pending_conversion_token');
-            }
+            console.log(`Converted ${data.thoughts_converted} anonymous thoughts`);
+
+            // Clean up anonymous session data
+            localStorage.removeItem(this.ANON_SESSION_KEY);
+            localStorage.removeItem('pending_conversion_token');
         } catch (error) {
             console.error('Error converting anonymous thoughts:', error);
         }
@@ -408,20 +380,7 @@ class AuthManager {
      * Make authenticated API request
      */
     async apiRequest(endpoint, options = {}) {
-        const defaultOptions = {
-            headers: this.getAuthHeaders()
-        };
-
-        const response = await fetch(`${this.API_BASE}${endpoint}`, {
-            ...defaultOptions,
-            ...options,
-            headers: {
-                ...defaultOptions.headers,
-                ...options.headers
-            }
-        });
-
-        return this.handleApiResponse(response);
+        return apiService.request(endpoint, options);
     }
 
     /**

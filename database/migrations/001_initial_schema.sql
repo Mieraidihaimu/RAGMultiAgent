@@ -93,7 +93,7 @@ CREATE TABLE thought_cache (
 
 -- Indexes for cache lookups
 CREATE INDEX idx_cache_user_embedding ON thought_cache USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX idx_cache_expires ON thought_cache(expires_at) WHERE expires_at > NOW();
+CREATE INDEX idx_cache_expires ON thought_cache(expires_at);
 
 -- Function to match similar thoughts using vector similarity
 CREATE OR REPLACE FUNCTION match_similar_thoughts(

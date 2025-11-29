@@ -144,6 +144,38 @@ class SupabaseAdapter(DatabaseAdapter):
         result = self.client.table("users").select("*").eq("id", user_id).execute()
         return result.data[0] if result.data else None
 
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user record by email"""
+        result = self.client.table("users").select("*").eq("email", email).execute()
+        return result.data[0] if result.data else None
+
+    async def get_user_consent_status(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user's consent status"""
+        result = self.client.table("users")\
+            .select("consent_terms_accepted, consent_terms_accepted_at, consent_terms_version, " +
+                   "consent_privacy_accepted, consent_privacy_accepted_at, consent_privacy_version, " +
+                   "consent_marketing, consent_marketing_at, consent_analytics, consent_analytics_at, " +
+                   "consent_data_processing, consent_data_processing_at, data_retention_acknowledged")\
+            .eq("id", user_id)\
+            .execute()
+        return result.data[0] if result.data else None
+
+    async def update_user_consent(
+        self,
+        user_id: str,
+        consent_updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update user consent preferences"""
+        if not consent_updates:
+            return await self.get_user(user_id)
+        
+        result = self.client.table("users")\
+            .update(consent_updates)\
+            .eq("id", user_id)\
+            .execute()
+        
+        return result.data[0] if result.data else None
+
     async def update_user_context(
         self,
         user_id: str,

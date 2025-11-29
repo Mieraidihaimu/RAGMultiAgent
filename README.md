@@ -243,7 +243,7 @@ docker-compose --profile monitoring up -d
 - Kafka & Batch Processing: Consumer lag, throughput, cache hit rate
 - Database & Cache: PostgreSQL and Redis health
 
-See [MONITORING.md](MONITORING.md) for complete guide.
+See [docs/monitoring/GUIDE.md](docs/monitoring/GUIDE.md) for complete guide.
 
 ## Common Commands
 
@@ -272,25 +272,24 @@ docker compose exec db psql -U thoughtprocessor
 - **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - **Developer onboarding guide** ⭐
 
 ### Getting Started
-- [QUICK_START.md](QUICK_START.md) - Detailed getting started guide
+- [docs/QUICK_START.md](docs/QUICK_START.md) - Detailed getting started guide
 - [README.md](README.md) - This file (overview and quick start)
 
 ### Architecture & Contracts
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design decisions
-- **[SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md)** - **Service responsibilities and API contracts** ⭐
-- [SERVICE_CONTRACTS_QUICK_REFERENCE.md](SERVICE_CONTRACTS_QUICK_REFERENCE.md) - Quick reference for contracts
-- [SERVICE_ARCHITECTURE_DIAGRAM.md](SERVICE_ARCHITECTURE_DIAGRAM.md) - Visual service communication diagrams
+- **[docs/architecture/SERVICE_CONTRACTS.md](docs/architecture/SERVICE_CONTRACTS.md)** - **Service responsibilities and API contracts** ⭐
+- [docs/architecture/SCHEMAS.md](docs/architecture/SCHEMAS.md) - Schemas summary
 
 ### Operations & Monitoring
-- [MONITORING.md](MONITORING.md) - Complete monitoring & observability guide
-- [MONITORING_QUICK_REFERENCE.md](MONITORING_QUICK_REFERENCE.md) - Quick monitoring reference
+- [docs/monitoring/GUIDE.md](docs/monitoring/GUIDE.md) - Complete monitoring & observability guide
+- [docs/monitoring/QUICK_REF.md](docs/monitoring/QUICK_REF.md) - Quick monitoring reference
 
 ### Testing & Deployment
 - [tests/README.md](tests/README.md) - Integration test documentation
-- [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - Deployment checklist
+- [docs/deployment/CHECKLIST.md](docs/deployment/CHECKLIST.md) - Deployment checklist
 
 ### Features
-- [SEARCH_INTEGRATION.md](SEARCH_INTEGRATION.md) - Search functionality guide
+- [docs/features/SEARCH.md](docs/features/SEARCH.md) - Search functionality guide
 
 ## Tech Stack
 
